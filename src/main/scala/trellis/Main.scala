@@ -15,18 +15,24 @@ object Main:
       case Some("dump-f2") => println(Canon.encodeGraph(Bootstrap.f2))
       case Some("dump-f3") => println(Canon.encodeGraph(Bootstrap.f3))
       case Some("dump-f4") => println(Canon.encodeGraph(Bootstrap.f4))
+      case Some("dump-f5") => println(Canon.encodeGraph(Bootstrap.f5))
       case Some("delta-f1") => println(Delta.encodeChange(Bootstrap.f1Change))
       case Some("delta-f2") => println(Delta.encodeChange(Bootstrap.f2Change))
       case Some("delta-f3") => println(Delta.encodeChange(Bootstrap.f3Change))
       case Some("delta-f4") => println(Delta.encodeChange(Bootstrap.f4Change))
+      case Some("delta-f5") => println(Delta.encodeChange(Bootstrap.f5Change))
       case Some("hash") => println(Canon.graphId(Bootstrap.graph).value)
       case Some("hash-f0") => println(Canon.graphId(Bootstrap.f0).value)
       case Some("hash-f1") => println(Canon.graphId(Bootstrap.f1).value)
       case Some("hash-f2") => println(Canon.graphId(Bootstrap.f2).value)
       case Some("hash-f3") => println(Canon.graphId(Bootstrap.f3).value)
       case Some("hash-f4") => println(Canon.graphId(Bootstrap.f4).value)
+      case Some("hash-f5") => println(Canon.graphId(Bootstrap.f5).value)
       case Some("svg") => writeOrPrint(args.drop(1).headOption, Project.Svg.render(Bootstrap.graph).content)
       case Some("typst") => writeOrPrint(args.drop(1).headOption, Project.Typst.render(Bootstrap.graph).content)
+      case Some("svg-ownership") => writeOrPrint(args.drop(1).headOption, Project.OwnershipSvg.render(Bootstrap.graph).content)
+      case Some("svg-process") => writeOrPrint(args.drop(1).headOption, Project.ProcessSvg.render(Bootstrap.graph).content)
+      case Some("svg-machine") => writeOrPrint(args.drop(1).headOption, Project.MachineSvg.render(Bootstrap.graph).content)
       case _ => demo()
 
   private def demo(): Unit =
@@ -39,14 +45,18 @@ object Main:
     println(s"F3 delta:        ${Bootstrap.F3ChangeId}")
     println(s"F3 root:         ${Bootstrap.F3Root}")
     println(s"F4 delta:        ${Bootstrap.F4ChangeId}")
-    println(s"F4 root:         ${Canon.graphId(base).value}")
+    println(s"F4 root:         ${Bootstrap.F4Root}")
+    println(s"F5 delta:        ${Bootstrap.F5ChangeId}")
+    println(s"F5 root:         ${Canon.graphId(base).value}")
     println(s"nodes: ${base.nodes.size}, edges: ${base.edges.size}, entities: ${base.entities.size}")
     println(s"resource rules:  ${Check.ResourceRules.rules(base).size}")
     println(s"process rules:   ${Check.ProcessRules.rules(base).size}")
     println(s"machine rules:   ${Check.MachineRules.rules(base).size}")
+    println(s"projection views:${Project.ProjectionRules.views(base).size}")
+    println(s"projection rules:${Project.ProjectionRules.rules(base).size}")
 
     val publication = Publication(
-      PublicationId("foundation-f4-demo"),
+      PublicationId("foundation-f5-demo"),
       "trellis/application/default",
       "stable",
       Set.empty,

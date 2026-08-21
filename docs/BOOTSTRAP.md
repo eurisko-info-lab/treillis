@@ -1,16 +1,19 @@
-# Trellis Bootstrap
+# Bootstrap
 
-The Scala host remains intentionally small. It provides the generic graph/CAS/change substrate, validation, a tiny trusted transition-primitive set, repository mechanics, projections, and the bootstrap interpreter.
+The Scala bootstrap is intentionally small. It supplies canonical graph/change encoding, repository mechanics, generic validation, a reference machine primitive executor, semantic navigation, and primitive projection rendering.
 
-The foundation staircase is data-derived:
+The current foundation is F5 and is reconstructed at startup from the frozen staircase:
 
 ```text
-F0 + F1.delta = F1   semantic schema
-F1 + F2.delta = F2   resource calculus
-F2 + F3.delta = F3   process/channel calculus
-F3 + F4.delta = F4   CESK-R transition semantics
+F0 + F1.delta -> F1
+F1 + F2.delta -> F2
+F2 + F3.delta -> F3
+F3 + F4.delta -> F4
+F4 + F5.delta -> F5
 ```
 
-No F1/F2/F3/F4 graph snapshots are checked in. Each successor is reconstructed from its predecessor plus one canonical DeltaTrellis change.
+No F1-F5 graph snapshot is supplied.
 
-F4 is the first machine-semantics foundation. The Trellis graph owns the instruction-to-transition-primitive dispatch table. Scala executes only the small trusted primitive vocabulary and keeps the old F3 direct dispatcher temporarily as a parity oracle.
+F5 makes projection policy graph-resident. `Project.scala` interprets `projection.view` and `projection.rule` nodes and delegates only to a small set of trusted rendering primitives. The former direct projector remains solely as a temporary parity oracle.
+
+Current bootstrap roots and delta IDs are printed by `sbt run` and can be queried individually with `hash-fN` and `delta-fN` commands.

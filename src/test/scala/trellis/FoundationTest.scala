@@ -147,5 +147,43 @@ object FoundationTest:
         Set("alloc", "move", "borrow-shared", "borrow-mut", "end-borrow", "drop",
           "new-channel", "send", "receive", "spawn", "terminate", "join")
       )
+    }),
+    Test("F5 delta is canonical data depending exactly on F4", () => {
+      val change = Bootstrap.f5Change
+      equal(Change.id(change).value, Bootstrap.F5ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F4ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F5 is derived only from F4 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f4, Bootstrap.f5Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f5)))
+      equal(Canon.graphId(derived).value, Bootstrap.F5Root)
+    }),
+    Test("F5 projection components, views, and render rules are Trellis graph data", () => {
+      val graph = Bootstrap.f5
+      check(Bootstrap.f5ComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f5ViewEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f5RuleEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f5ComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("projection.component")))
+      Bootstrap.f5ViewEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("projection.view")))
+      Bootstrap.f5RuleEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("projection.rule")))
+      equal(graph.entity(EntityId("projection.engine")).map(_.kind), Some("projection.schema"))
+      equal(Project.ProjectionRules.views(graph).size, 6)
+      equal(Project.ProjectionRules.rules(graph).size, 10)
+    }),
+    Test("F5 projection relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f5).isEmpty)
+      val roles = Bootstrap.f5.edges.values.map(_.role).toSet
+      check(Set("projection.component", "projection.view").subsetOf(roles))
+      equal(Bootstrap.f5.edges.size, 91)
+    }),
+    Test("F5 view and primitive policy comes from graph data", () => {
+      val svg = Project.ProjectionRules.view(Bootstrap.f5, EntityId("projection.svg")).fold(err => throw new AssertionError(err), identity)
+      equal(svg.format, "svg")
+      equal(svg.int("width", 0), 640)
+      check(Project.ProjectionRules.hasPrimitive(Bootstrap.f5, EntityId("projection.svg"), "node", "svg-node"))
+      check(Project.ProjectionRules.hasPrimitive(Bootstrap.f5, EntityId("projection.svg"), "edge", "svg-edge"))
+      val machineView = Project.ProjectionRules.view(Bootstrap.f5, EntityId("projection.svg.machine")).fold(err => throw new AssertionError(err), identity)
+      equal(machineView.attrs.get("node-filter"), Some("entity-prefix:machine."))
     })
   )

@@ -13,6 +13,7 @@ import trellis.Delta.*
  *   F1 + F2.delta = F2
  *   F2 + F3.delta = F3
  *   F3 + F4.delta = F4
+ *   F4 + F5.delta = F5
  *
  * No successor graph snapshot is checked in.
  */
@@ -26,6 +27,8 @@ object Bootstrap:
   val F3Root = "c565d28a992289608c45fac5ace462d1b2e05059ae83bfb5507c25bad311cc1c"
   val F4ChangeId = "678d58fddf41d20375e3485fb19a0c0d13b904ab1a317936d32ac0c4f5d52d7a"
   val F4Root = "616a960470e389c665ab94280b70bb5c7e203ba3b78cdf0b373948a0adf60847"
+  val F5ChangeId = "d6fb1fb29f9864cbd8062af1b066270883aa0efcbe8dc405dfd17935fd091368"
+  val F5Root = "3516c065b71cce1667a5075625deea2ee88f0e58365ccc21d215e86127b3aab1"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -182,6 +185,38 @@ object Bootstrap:
     EntityId("machine.rule.join")
   )
 
+  val f5ComponentEntities: Set[EntityId] = Set(
+    EntityId("projection.selection"),
+    EntityId("projection.view"),
+    EntityId("projection.render-rule"),
+    EntityId("projection.layout"),
+    EntityId("projection.semantic-anchor"),
+    EntityId("projection.navigation-target"),
+    EntityId("projection.document")
+  )
+
+  val f5ViewEntities: Set[EntityId] = Set(
+    EntityId("projection.code"),
+    EntityId("projection.svg"),
+    EntityId("projection.svg.ownership"),
+    EntityId("projection.svg.process"),
+    EntityId("projection.svg.machine"),
+    EntityId("projection.typst")
+  )
+
+  val f5RuleEntities: Set[EntityId] = Set(
+    EntityId("projection.rule.code.node"),
+    EntityId("projection.rule.svg.node"),
+    EntityId("projection.rule.svg.edge"),
+    EntityId("projection.rule.svg.ownership.node"),
+    EntityId("projection.rule.svg.ownership.edge"),
+    EntityId("projection.rule.svg.process.node"),
+    EntityId("projection.rule.svg.process.edge"),
+    EntityId("projection.rule.svg.machine.node"),
+    EntityId("projection.rule.svg.machine.edge"),
+    EntityId("projection.rule.typst.entity")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -231,8 +266,19 @@ object Bootstrap:
   lazy val f4: Graph =
     deriveFoundation("F4", f3, f4Change, F4Root)
 
+  lazy val f5Change: Change =
+    val change = loadFoundationChange("F5", F5ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F4ChangeId)),
+      "F5.delta must depend exactly on F4.delta"
+    )
+    change
+
+  lazy val f5: Graph =
+    deriveFoundation("F5", f4, f5Change, F5Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f4
+  lazy val graph: Graph = f5
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")
