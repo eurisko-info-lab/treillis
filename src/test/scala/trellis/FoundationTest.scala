@@ -80,5 +80,39 @@ object FoundationTest:
       equal((u.duplicate, u.discard), ("allow", "allow"))
       equal((a.duplicate, a.discard), ("forbid", "drop"))
       equal((l.duplicate, l.discard), ("forbid", "forbid"))
+    }),
+    Test("F3 delta is canonical data depending exactly on F2", () => {
+      val change = Bootstrap.f3Change
+      equal(Change.id(change).value, Bootstrap.F3ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F2ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F3 is derived only from F2 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f2, Bootstrap.f3Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f3)))
+      equal(Canon.graphId(derived).value, Bootstrap.F3Root)
+    }),
+    Test("F3 process concepts, capabilities, operations, and rules are Trellis graph data", () => {
+      val graph = Bootstrap.f3
+      check(Bootstrap.f3ProcessEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f3CapabilityEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f3OperationEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f3RuleEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f3ProcessEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("process.kind")))
+      Bootstrap.f3CapabilityEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("process.capability")))
+      Bootstrap.f3OperationEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("process.operation")))
+      Bootstrap.f3RuleEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("process.rule")))
+      equal(Check.ProcessRules.rules(graph).size, 10)
+    }),
+    Test("F3 process relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f3).isEmpty)
+      val roles = Bootstrap.f3.edges.values.map(_.role).toSet
+      check(Set("process.operation", "process.mode", "process.send-capability", "process.recv-capability").subsetOf(roles))
+      equal(Bootstrap.f3.edges.size, 54)
+    }),
+    Test("F3 endpoint structural modes come from graph data", () => {
+      equal(Check.ProcessRules.endpointMode(Bootstrap.f3, EntityId("process.capability.send")), Right(Mode.Unrestricted))
+      equal(Check.ProcessRules.endpointMode(Bootstrap.f3, EntityId("process.capability.recv")), Right(Mode.Affine))
+      equal(Check.ProcessRules.endpointMode(Bootstrap.f3, EntityId("process.capability.handle")), Right(Mode.Affine))
     })
   )

@@ -11,8 +11,9 @@ import trellis.Delta.*
  *
  *   F0 + F1.delta = F1
  *   F1 + F2.delta = F2
+ *   F2 + F3.delta = F3
  *
- * No F1 or F2 graph snapshot is checked in.
+ * No successor graph snapshot is checked in.
  */
 object Bootstrap:
   val F0Root = "6503a6ecb482388edcea4258224e49547da4ece85233687b981d2086d40b13dd"
@@ -20,6 +21,8 @@ object Bootstrap:
   val F1Root = "b8fddea20b4dba0ded6493fa70e98650377ea66bed2b0e0363b29a252dd6fe45"
   val F2ChangeId = "36a8f04e97463c76b74f176c574aa5910099b6d9c562a22e56785bd822488de1"
   val F2Root = "09cc9ba6664b4e8dd84e4937a2b0cd63ea0863e9c2fdbcdeea27284f89da9496"
+  val F3ChangeId = "12abc3e2f986d514d59d76d93b77fd1ba5221b3dfadd121c04134321f53ed5eb"
+  val F3Root = "c565d28a992289608c45fac5ace462d1b2e05059ae83bfb5507c25bad311cc1c"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -110,6 +113,41 @@ object Bootstrap:
     EntityId("resource.rule.end-borrow.mut")
   )
 
+  val f3ProcessEntities: Set[EntityId] = Set(
+    EntityId("process.process"),
+    EntityId("process.channel"),
+    EntityId("process.queue"),
+    EntityId("process.message")
+  )
+
+  val f3CapabilityEntities: Set[EntityId] = Set(
+    EntityId("process.capability.send"),
+    EntityId("process.capability.recv"),
+    EntityId("process.capability.handle")
+  )
+
+  val f3OperationEntities: Set[EntityId] = Set(
+    EntityId("process.new-channel"),
+    EntityId("process.send"),
+    EntityId("process.receive"),
+    EntityId("process.spawn"),
+    EntityId("process.join"),
+    EntityId("process.terminate")
+  )
+
+  val f3RuleEntities: Set[EntityId] = Set(
+    EntityId("process.rule.new-channel"),
+    EntityId("process.rule.send.unrestricted"),
+    EntityId("process.rule.send.affine"),
+    EntityId("process.rule.send.linear"),
+    EntityId("process.rule.receive"),
+    EntityId("process.rule.spawn.unrestricted"),
+    EntityId("process.rule.spawn.affine"),
+    EntityId("process.rule.spawn.linear"),
+    EntityId("process.rule.join"),
+    EntityId("process.rule.terminate")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -137,8 +175,19 @@ object Bootstrap:
   lazy val f2: Graph =
     deriveFoundation("F2", f1, f2Change, F2Root)
 
+  lazy val f3Change: Change =
+    val change = loadFoundationChange("F3", F3ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F2ChangeId)),
+      "F3.delta must depend exactly on F2.delta"
+    )
+    change
+
+  lazy val f3: Graph =
+    deriveFoundation("F3", f2, f3Change, F3Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f2
+  lazy val graph: Graph = f3
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")

@@ -10,6 +10,10 @@ F0
 F1
   + F2.delta
   = F2
+
+F2
+  + F3.delta
+  = F3
 ```
 
 Frozen identifiers:
@@ -29,30 +33,62 @@ F2.delta
 
 F2 root
 09cc9ba6664b4e8dd84e4937a2b0cd63ea0863e9c2fdbcdeea27284f89da9496
+
+F3.delta
+12abc3e2f986d514d59d76d93b77fd1ba5221b3dfadd121c04134321f53ed5eb
+
+F3 root
+c565d28a992289608c45fac5ace462d1b2e05059ae83bfb5507c25bad311cc1c
 ```
 
 ## F2: resource calculus
 
-F2 moves the concrete resource policy out of Scala conditionals and into Trellis graph data.
+F2 moves concrete resource policy out of Scala conditionals and into Trellis graph data.
+
+It defines structural modes, resource capabilities, move/borrow/drop/replicate/erase operations, ten resource rules, and first-class rule relationships.
+
+The Scala bootstrap retains a generic resource-rule matcher rather than per-operation Trellis semantics.
+
+## F3: process/channel calculus
+
+F3 builds concurrency on top of F2 rather than redefining ownership.
 
 It defines:
 
-- structural modes `unrestricted`, `affine`, and `linear`;
-- capability kinds `pure`, `own`, `read`, `write`, and `suspended`;
-- resource operations `move`, shared/mutable borrow, `end-borrow`, `drop`, `replicate`, and `erase`;
-- ten graph-defined resource rules;
-- first-class edges connecting rules to operations, modes, and capabilities.
+- process, channel, queue, and message semantic kinds;
+- send, receive, and process-handle capability definitions;
+- `new-channel`, `send`, `receive`, `spawn`, `join`, and `terminate` operations;
+- ten graph-defined process rules;
+- first-class edges from rules to operations and F2 modes;
+- first-class channel relationships to send/receive capability definitions.
 
-The Scala bootstrap retains only a tiny generic rule interpreter. A rule is matched using generic attributes such as:
+The graph-defined dispositions are:
 
 ```text
-port.in.mode = unrestricted
-port.owner.capability = own
-port.loan.capability = read
-same-inner = owner,loan
-result = allow | lower-drop
+create-channel
+copy-to-channel
+transfer-to-channel
+transfer-to-process
+share-with-child
+transfer-to-child
+transfer-to-joiner
+structural-discard
 ```
 
-Thus `core.replicate` is not special-cased by the host. F2 states that its `in` port must be unrestricted. Affine erasure is likewise described by F2 as `lower-drop`.
+This makes the distinction between unrestricted communication and affine/linear capability transfer explicit in F3 data:
 
-No `F2.graph` file exists. The only successor artifact is `F2.delta`.
+```text
+send unrestricted -> copy-to-channel
+send affine       -> transfer-to-channel
+send linear       -> transfer-to-channel
+
+spawn unrestricted capture -> share-with-child
+spawn affine capture       -> transfer-to-child
+spawn linear capture       -> transfer-to-child
+```
+
+Process termination delegates live-resource disposal to the structural policy already defined by F2. Thus unrestricted values may be erased, affine values are dropped, and live linear obligations prevent termination.
+
+`Send` endpoint capability mode is unrestricted, while `Recv` and process-handle capability modes are affine. These modes are read from F3 graph nodes by the reference machine.
+
+No `F1.graph`, `F2.graph`, or `F3.graph` file exists. Each successor is reconstructed strictly from its predecessor plus one canonical delta.

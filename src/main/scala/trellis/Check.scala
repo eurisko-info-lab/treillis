@@ -7,6 +7,16 @@ object Check:
   enum ResourceDisposition:
     case Allow, LowerDrop
 
+  enum ProcessDisposition:
+    case CreateChannel
+    case CopyToChannel
+    case TransferToChannel
+    case TransferToProcess
+    case ShareWithChild
+    case TransferToChild
+    case TransferToJoiner
+    case StructuralDiscard
+
   final case class StructuralPolicy(duplicate: String, discard: String):
     def duplicateAllowed: Boolean = duplicate == "allow"
 
@@ -140,9 +150,83 @@ object Check:
       case Mode.Affine => "drop"
       case Mode.Linear => "forbid"
 
+  final case class ProcessRule(
+      entity: EntityId,
+      operation: String,
+      mode: Option[Mode],
+      disposition: ProcessDisposition
+  )
+
+  /** F3 process/channel semantics are graph-defined; Scala interprets this tiny table vocabulary. */
+  object ProcessRules:
+    def rules(graph: Graph): Vector[ProcessRule] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "process.rule").flatMap(node => decodeRule(entity, node).toOption)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val decoded = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "process.rule").toVector.map(node => entity -> decodeRule(entity, node))
+      }
+      val malformed = decoded.flatMap { case (entity, result) =>
+        result match
+          case Left(error) => Vector(s"invalid process rule ${entity.value}: $error")
+          case Right(_) => Vector.empty
+      }
+      val ambiguous = decoded.collect { case (_, Right(rule)) => rule }
+        .groupBy(rule => (rule.operation, rule.mode))
+        .toVector
+        .sortBy { case ((operation, mode), _) => (operation, mode.map(Canon.encodeMode).getOrElse("")) }
+        .flatMap { case ((operation, mode), rs) =>
+          if rs.size <= 1 then Vector.empty
+          else Vector(s"ambiguous process rules for $operation/${mode.map(Canon.encodeMode).getOrElse("any")}")
+        }
+      malformed ++ ambiguous
+
+    def forOperation(graph: Graph, operation: String): Vector[ProcessRule] =
+      rules(graph).filter(_.operation == operation)
+
+    def decision(graph: Graph, operation: String, mode: Option[Mode] = None): Option[ProcessDisposition] =
+      forOperation(graph, operation)
+        .find(rule => rule.mode.isEmpty || rule.mode == mode)
+        .map(_.disposition)
+
+    def endpointMode(graph: Graph, entity: EntityId): Either[String, Mode] =
+      graph.entity(entity) match
+        case Some(node) if node.kind == "process.capability" =>
+          node.attrs.get("mode").toRight(s"${entity.value} lacks mode").flatMap(decodeMode)
+        case Some(node) => Left(s"${entity.value} is ${node.kind}, expected process.capability")
+        case None => Left(s"missing process capability ${entity.value}")
+
+    private def decodeRule(entity: EntityId, node: Node): Either[String, ProcessRule] =
+      for
+        operation <- node.attrs.get("operation").toRight(s"${entity.value} lacks operation")
+        mode <- node.attrs.get("mode") match
+          case None => Right(None)
+          case Some(value) => decodeMode(value).map(Some(_))
+        disposition <- node.attrs.get("result") match
+          case Some("create-channel") => Right(ProcessDisposition.CreateChannel)
+          case Some("copy-to-channel") => Right(ProcessDisposition.CopyToChannel)
+          case Some("transfer-to-channel") => Right(ProcessDisposition.TransferToChannel)
+          case Some("transfer-to-process") => Right(ProcessDisposition.TransferToProcess)
+          case Some("share-with-child") => Right(ProcessDisposition.ShareWithChild)
+          case Some("transfer-to-child") => Right(ProcessDisposition.TransferToChild)
+          case Some("transfer-to-joiner") => Right(ProcessDisposition.TransferToJoiner)
+          case Some("structural-discard") => Right(ProcessDisposition.StructuralDiscard)
+          case Some(other) => Left(s"${entity.value} has unknown result $other")
+          case None => Left(s"${entity.value} lacks result")
+      yield ProcessRule(entity, operation, mode, disposition)
+
+    private def decodeMode(value: String): Either[String, Mode] = value match
+      case "unrestricted" => Right(Mode.Unrestricted)
+      case "affine" => Right(Mode.Affine)
+      case "linear" => Right(Mode.Linear)
+      case other => Left(s"unknown structural mode $other")
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
+    errors ++= ProcessRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)
