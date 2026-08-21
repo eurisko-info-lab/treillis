@@ -1,37 +1,52 @@
-# Bootstrap Contract
+# Bootstrap boundary
 
-The Scala host exists to make Trellis capable of defining more Trellis.
+The Scala implementation is intentionally a small host kernel. Its job is to make the Trellis semantic repository reproducible enough that more of Trellis can move into Trellis data.
 
-## What Scala is allowed to know
+## Scala remains responsible for
 
-The host kernel may permanently know only small constitutional mechanics:
+- the generic immutable graph substrate (`Node`, `Port`, `Edge`, IDs);
+- canonical UTF-8 encoding/strict decoding and SHA-256 addressing;
+- the free DeltaTrellis change constructors and replay mechanics;
+- change-DAG closure, conflict detection, branch frontiers, and provenance;
+- the small trusted graph/resource validator;
+- the CESK-R reference machine bootstrap;
+- semantic selection and projection plumbing.
 
-1. immutable IDs and graph containers;
-2. canonical encoding/hashing;
-3. the free change envelope and replay mechanics;
-4. branch/change-DAG mechanics;
-5. a minimal trusted graph/resource validation substrate;
-6. a minimal reference machine substrate;
-7. projection and navigation interfaces;
-8. bootstrap loading.
+## The Trellis graph increasingly owns
 
-## What should migrate into Trellis data
+- semantic node-kind definitions;
+- the vocabulary of entities, changes, frontiers, holes, and modes;
+- resource/protocol libraries;
+- laws and proofs;
+- projection definitions;
+- optimizer rules;
+- package and builder descriptions.
 
-As soon as practical, these belong in the semantic repository rather than Scala:
+The constitutional direction is:
 
-- concrete language node kinds;
-- standard types/resources/protocols;
-- typing rules beyond the tiny kernel;
-- CESK transition rules;
-- projection templates;
-- optimizer rewrites and cost models;
-- DeltaNet lowering rules;
-- builders and target descriptions;
-- package policies;
-- documentation.
+```text
+small Scala graph machine
+        |
+        v
+canonical bootstrap graph
+        |
+        + DeltaTrellis
+        v
+Trellis defines more Trellis
+```
 
-## Bootstrap success criterion
+The host kernel should not grow merely because a new Trellis semantic construct is introduced.
 
-The bootstrap is successful when a new Trellis revision can introduce a substantial language feature by publishing semantic graph definitions and `ΔTrellis` changes without adding a new Scala source file.
+## Current closure checkpoint
 
-A later clean-room implementation should be able to reproduce the same canonical graph/change hashes from the frozen bootstrap specification.
+The v0.2 slice freezes a literal bootstrap root and tests:
+
+- exact canonical text/byte round trips;
+- adversarial canonical decoding;
+- content-hash integrity;
+- predecessor-plus-delta derivation staircases;
+- byte-identical replay of independent changes;
+- upstream basis provenance separated from local frontier;
+- graph-level definitions of Node, Port, Edge, Entity, Change, Frontier, Hole, and Mode.
+
+See `FOUNDATION.md` for the exact root and wire rules.

@@ -23,21 +23,30 @@ object Delta:
   )
 
   object Change:
-    def id(change: Change): ChangeId =
-      val deps = change.dependencies.toVector.map(_.value).sorted.mkString("|")
-      val ops = change.operations.map(encodeOp).mkString("|")
-      ChangeId(Canon.sha256(s"deps=$deps;ops=$ops;message=${change.message};author=${change.author}"))
+    def id(change: Change): ChangeId = ChangeId(Canon.sha256(encodeChange(change)))
+
+  def encodeChange(change: Change): String =
+    val deps = change.dependencies.toVector.sortBy(_.value).map(_.value)
+    Canon.record(
+      "change",
+      Vector(
+        Canon.record("dependencies", deps),
+        Canon.record("operations", change.operations.map(encodeOp)),
+        change.message,
+        change.author
+      )
+    )
 
   def encodeOp(op: Op): String = op match
-    case Op.AddNode(node) => s"add-node:${Canon.encodeNode(node)}"
-    case Op.BindEntity(entity, node) => s"bind:${entity.value}:${node.value}"
-    case Op.ReplaceEntity(entity, node) => s"replace:${entity.value}:${Canon.encodeNode(node)}"
-    case Op.RemoveEntity(entity) => s"remove-entity:${entity.value}"
-    case Op.Connect(edge) => s"connect:${Canon.encodeEdge(edge)}"
-    case Op.Disconnect(edge) => s"disconnect:${edge.value}"
-    case Op.AddRoot(name, node) => s"add-root:$name:${node.value}"
-    case Op.RemoveRoot(name) => s"remove-root:$name"
-    case Op.RefineHole(entity, replacement) => s"refine:${entity.value}:${Canon.encodeNode(replacement)}"
+    case Op.AddNode(node) => Canon.record("op.add-node", Vector(Canon.encodeNode(node)))
+    case Op.BindEntity(entity, node) => Canon.record("op.bind-entity", Vector(entity.value, node.value))
+    case Op.ReplaceEntity(entity, node) => Canon.record("op.replace-entity", Vector(entity.value, Canon.encodeNode(node)))
+    case Op.RemoveEntity(entity) => Canon.record("op.remove-entity", Vector(entity.value))
+    case Op.Connect(edge) => Canon.record("op.connect", Vector(Canon.encodeEdge(edge)))
+    case Op.Disconnect(edge) => Canon.record("op.disconnect", Vector(edge.value))
+    case Op.AddRoot(name, node) => Canon.record("op.add-root", Vector(name, node.value))
+    case Op.RemoveRoot(name) => Canon.record("op.remove-root", Vector(name))
+    case Op.RefineHole(entity, replacement) => Canon.record("op.refine-hole", Vector(entity.value, Canon.encodeNode(replacement)))
 
   /** Keys used to reject concurrent semantic edits that would not commute. */
   def footprint(change: Change): Set[String] = change.operations.flatMap {

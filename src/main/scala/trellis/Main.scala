@@ -10,6 +10,7 @@ object Main:
   def main(args: Array[String]): Unit =
     args.headOption match
       case Some("dump") => println(Canon.encodeGraph(Bootstrap.graph))
+      case Some("hash") => println(Canon.graphId(Bootstrap.graph).value)
       case Some("svg") => writeOrPrint(args.drop(1).headOption, Project.Svg.render(Bootstrap.graph).content)
       case Some("typst") => writeOrPrint(args.drop(1).headOption, Project.Typst.render(Bootstrap.graph).content)
       case _ => demo()
@@ -29,7 +30,7 @@ object Main:
       "demo-signature"
     )
     val branchId = BranchId("local/demo")
-    val branch = branchFromPublication(branchId, base, publication)
+    val branch = branchFromPublication(branchId, base, publication).fold(err => throw new IllegalStateException(err), identity)
     var store = Store().addBranch(branch)
 
     val hello = Node("app.function", attrs = Map("name" -> "hello", "result" -> "Unit"))
@@ -39,6 +40,9 @@ object Main:
 
     println(s"local graph:     ${Canon.graphId(materialized.graph).value}")
     println(s"changes applied: ${materialized.applied.size}")
+    provenance(store.branches(branchId)).foreach { p =>
+      println(s"upstream basis:  ${p.packageName}/${p.branch} @ ${p.basisRoot.value.take(12)}")
+    }
     println("\nCode View:\n" + Project.CodeView.render(materialized.graph).content.linesIterator.take(8).mkString("\n"))
 
   private def writeOrPrint(path: Option[String], content: String): Unit = path match

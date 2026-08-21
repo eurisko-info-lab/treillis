@@ -6,7 +6,15 @@ import trellis.Delta.*
 
 /** Pijul-inspired immutable change DAG, branch frontiers, and a tiny local global-ledger model. */
 object Repo:
-  final case class Upstream(packageName: String, branch: String, publication: PublicationId)
+  final case class Upstream(
+      packageName: String,
+      branch: String,
+      publication: PublicationId,
+      basisRoot: ContentId,
+      basisFrontier: Set[ChangeId]
+  )
+
+  /** `basis` is already materialized at the upstream basis frontier; `frontier` contains local changes only. */
   final case class Branch(id: BranchId, basis: Graph, frontier: Set[ChangeId], upstream: Option[Upstream])
 
   final case class Publication(
@@ -17,6 +25,15 @@ object Repo:
       graphRoot: ContentId,
       publisher: String,
       signature: String
+  )
+
+  final case class Provenance(
+      publication: PublicationId,
+      packageName: String,
+      branch: String,
+      basisRoot: ContentId,
+      basisFrontier: Set[ChangeId],
+      localFrontier: Set[ChangeId]
   )
 
   final case class Ledger(records: Vector[Publication] = Vector.empty):
@@ -83,6 +100,7 @@ object Repo:
 
   def materialize(store: Store, branch: Branch): Either[String, Materialized] =
     for
+      _ <- validateProvenance(branch)
       ids <- closure(store, branch.frontier)
       _ <- validateConcurrency(store, ids)
       order <- topological(store, ids)
@@ -100,5 +118,27 @@ object Repo:
       s1.addBranch(next)
     }
 
-  def branchFromPublication(id: BranchId, graph: Graph, p: Publication): Branch =
-    Branch(id, graph, p.frontier, Some(Upstream(p.packageName, p.branch, p.id)))
+  def branchFromPublication(id: BranchId, graph: Graph, p: Publication): Either[String, Branch] =
+    val actualRoot = Canon.graphId(graph)
+    if actualRoot != p.graphRoot then
+      Left(s"publication ${p.id.value} claims ${p.graphRoot.value}, supplied basis is ${actualRoot.value}")
+    else
+      Right(
+        Branch(
+          id,
+          graph,
+          Set.empty,
+          Some(Upstream(p.packageName, p.branch, p.id, p.graphRoot, p.frontier))
+        )
+      )
+
+  def provenance(branch: Branch): Option[Provenance] = branch.upstream.map { u =>
+    Provenance(u.publication, u.packageName, u.branch, u.basisRoot, u.basisFrontier, branch.frontier)
+  }
+
+  def validateProvenance(branch: Branch): Either[String, Unit] = branch.upstream match
+    case None => Right(())
+    case Some(upstream) =>
+      val actual = Canon.graphId(branch.basis)
+      if actual == upstream.basisRoot then Right(())
+      else Left(s"branch ${branch.id.value} basis provenance mismatch: expected ${upstream.basisRoot.value}, found ${actual.value}")

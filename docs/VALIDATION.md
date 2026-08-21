@@ -1,21 +1,41 @@
-# Validation note
+# Validation
 
-This bundle was structurally checked in the generation environment:
-
-- 10 production Scala files;
-- 7 test Scala files;
-- no non-standard-library imports;
-- no obvious delimiter imbalance;
-- project layout and build metadata present;
-- JDK 21 is available.
-
-The environment does **not** contain Scala or sbt, and outbound Maven resolution is unavailable there, so the bundle was not compile-executed during generation. Run the following in a normal networked Scala environment:
+Run the complete bootstrap suite:
 
 ```bash
-sbt compile
-sbt "Test/compile"
 sbt "Test/runMain trellis.TestMain"
+```
+
+Compile and run the demo:
+
+```bash
 sbt run
 ```
 
-The bootstrap deliberately uses Scala 3.3.8 LTS and no library dependencies, which keeps external validation small.
+Print only the foundation root in a fresh JVM process:
+
+```bash
+sbt "run hash"
+```
+
+The expected v0.2 root is:
+
+```text
+6503a6ecb482388edcea4258224e49547da4ece85233687b981d2086d40b13dd
+```
+
+Dump the exact canonical text:
+
+```bash
+sbt "run dump" > bootstrap.canon
+```
+
+A useful clean-process reproduction check is:
+
+```bash
+expected=6503a6ecb482388edcea4258224e49547da4ece85233687b981d2086d40b13dd
+actual=$(sbt --error "run hash" | tail -n 1)
+test "$actual" = "$expected"
+```
+
+The Scala test suite additionally checks strict rejection of malformed/noncanonical encodings and byte-identical replay properties.
