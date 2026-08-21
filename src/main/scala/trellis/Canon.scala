@@ -182,7 +182,7 @@ object Canon:
         case None => Right(decoded)
     }
 
-  private def decodeNode(encoded: String): Either[String, Node] =
+  private[trellis] def decodeNode(encoded: String): Either[String, Node] =
     for
       parts <- fixed(encoded, "node", 3)
       kind = parts(0)
@@ -209,7 +209,7 @@ object Canon:
       ty <- decodeTy(parts(2))
     yield Port(parts(0), direction, ty)
 
-  private def decodeEdge(encoded: String): Either[String, Edge] =
+  private[trellis] def decodeEdge(encoded: String): Either[String, Edge] =
     for
       parts <- fixed(encoded, "edge", 3)
       from <- decodePortRef(parts(0))
@@ -286,10 +286,10 @@ object Canon:
     }
     missingEntity.orElse(missingRoot).orElse(badEdge).toLeft(())
 
-  private def validateHash(value: String, label: String): Either[String, Unit] =
+  private[trellis] def validateHash(value: String, label: String): Either[String, Unit] =
     if HashPattern.pattern.matcher(value).matches() then Right(()) else Left(s"malformed $label: $value")
 
-  private def nonEmpty(value: String, label: String): Either[String, Unit] =
+  private[trellis] def nonEmpty(value: String, label: String): Either[String, Unit] =
     if value.nonEmpty then Right(()) else Left(s"empty $label")
 
   private def ensureUnique[A](values: Vector[A], label: String): Either[String, Unit] =
@@ -297,18 +297,18 @@ object Canon:
       case Some(value) => Left(s"duplicate $label: $value")
       case None => Right(())
 
-  private def fields(encoded: String, expectedTag: String): Either[String, Vector[String]] =
+  private[trellis] def fields(encoded: String, expectedTag: String): Either[String, Vector[String]] =
     tagAndFields(encoded).flatMap { case (tag, values) =>
       if tag == expectedTag then Right(values) else Left(s"expected $expectedTag record, found $tag")
     }
 
-  private def fixed(encoded: String, expectedTag: String, arity: Int): Either[String, Vector[String]] =
+  private[trellis] def fixed(encoded: String, expectedTag: String, arity: Int): Either[String, Vector[String]] =
     fields(encoded, expectedTag).flatMap { values =>
       if values.size == arity then Right(values)
       else Left(s"$expectedTag record has ${values.size} fields; expected $arity")
     }
 
-  private def tagAndFields(encoded: String): Either[String, (String, Vector[String])] =
+  private[trellis] def tagAndFields(encoded: String): Either[String, (String, Vector[String])] =
     splitAtoms(utf8(encoded)).flatMap {
       case Vector() => Left("empty canonical record")
       case values => Right(values.head -> values.tail)
@@ -336,13 +336,13 @@ object Canon:
       offset += length
     Right(out.result())
 
-  private def decodeUtf8(bytes: Array[Byte]): Either[String, String] =
+  private[trellis] def decodeUtf8(bytes: Array[Byte]): Either[String, String] =
     val decoder = Utf8.newDecoder()
       .onMalformedInput(CodingErrorAction.REPORT)
       .onUnmappableCharacter(CodingErrorAction.REPORT)
     Try(decoder.decode(ByteBuffer.wrap(bytes)).toString).toEither.left.map(e => s"invalid UTF-8: ${e.getMessage}")
 
-  private def sequenceEither[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
+  private[trellis] def sequenceEither[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
     values.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) { (acc, item) =>
       for
         xs <- acc

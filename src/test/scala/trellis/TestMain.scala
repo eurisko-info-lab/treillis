@@ -6,6 +6,7 @@ object TestMain:
   def main(args: Array[String]): Unit =
     val suites = Vector(
       "Canon" -> CanonTest.tests,
+      "Foundation" -> FoundationTest.tests,
       "Repo" -> RepoTest.tests,
       "Check" -> CheckTest.tests,
       "Machine" -> MachineTest.tests,

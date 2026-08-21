@@ -5,8 +5,6 @@ import trellis.Core.*
 import trellis.TestSupport.*
 
 object CanonTest:
-  private val ExpectedBootstrapRoot = "6503a6ecb482388edcea4258224e49547da4ece85233687b981d2086d40b13dd"
-
   private def rawGraph(
       nodes: Vector[String] = Vector.empty,
       edges: Vector[String] = Vector.empty,
@@ -41,8 +39,8 @@ object CanonTest:
       val g2 = Graph(nodes = Map(bid -> b, aid -> a))
       check(Arrays.equals(Canon.encodeGraphBytes(g1), Canon.encodeGraphBytes(g2)))
     }),
-    Test("bootstrap graph has a literal cross-process foundation root", () => {
-      equal(Canon.graphId(Bootstrap.graph).value, ExpectedBootstrapRoot)
+    Test("F0 graph has its frozen cross-process foundation root", () => {
+      equal(Canon.graphId(Bootstrap.f0).value, Bootstrap.F0Root)
     }),
     Test("canonical graph text and bytes round trip exactly", () => {
       val graph = Bootstrap.graph
@@ -88,10 +86,10 @@ object CanonTest:
       val g3 = Canon.addEdge(g2, badEdge)._1
       check(Canon.decodeGraph(Canon.encodeGraph(g3)).isLeft)
     }),
-    Test("bootstrap graph self-describes the constitutional vocabulary", () => {
-      check(Bootstrap.constitutionalEntities.subsetOf(Bootstrap.graph.entities.keySet))
-      Bootstrap.constitutionalEntities.foreach { entity =>
-        check(Bootstrap.graph.entity(entity).exists(_.kind == "meta.node-kind"), s"missing self-description for ${entity.value}")
+    Test("F0 self-describes its constitutional vocabulary", () => {
+      check(Bootstrap.f0ConstitutionalEntities.subsetOf(Bootstrap.f0.entities.keySet))
+      Bootstrap.f0ConstitutionalEntities.foreach { entity =>
+        check(Bootstrap.f0.entity(entity).exists(_.kind == "meta.node-kind"), s"missing F0 self-description for ${entity.value}")
       }
     })
   )

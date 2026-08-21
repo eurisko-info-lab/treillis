@@ -10,18 +10,24 @@ object Main:
   def main(args: Array[String]): Unit =
     args.headOption match
       case Some("dump") => println(Canon.encodeGraph(Bootstrap.graph))
+      case Some("dump-f0") => println(Canon.encodeGraph(Bootstrap.f0))
+      case Some("delta-f1") => println(Delta.encodeChange(Bootstrap.f1Change))
       case Some("hash") => println(Canon.graphId(Bootstrap.graph).value)
+      case Some("hash-f0") => println(Canon.graphId(Bootstrap.f0).value)
+      case Some("hash-f1") => println(Canon.graphId(Bootstrap.f1).value)
       case Some("svg") => writeOrPrint(args.drop(1).headOption, Project.Svg.render(Bootstrap.graph).content)
       case Some("typst") => writeOrPrint(args.drop(1).headOption, Project.Typst.render(Bootstrap.graph).content)
       case _ => demo()
 
   private def demo(): Unit =
     val base = Bootstrap.graph
-    println(s"bootstrap graph: ${Canon.graphId(base).value}")
-    println(s"nodes: ${base.nodes.size}, entities: ${base.entities.size}")
+    println(s"F0 root:         ${Bootstrap.F0Root}")
+    println(s"F1 delta:        ${Bootstrap.F1ChangeId}")
+    println(s"F1 root:         ${Canon.graphId(base).value}")
+    println(s"nodes: ${base.nodes.size}, edges: ${base.edges.size}, entities: ${base.entities.size}")
 
     val publication = Publication(
-      PublicationId("genesis-demo"),
+      PublicationId("foundation-f1-demo"),
       "trellis/application/default",
       "stable",
       Set.empty,
@@ -43,7 +49,7 @@ object Main:
     provenance(store.branches(branchId)).foreach { p =>
       println(s"upstream basis:  ${p.packageName}/${p.branch} @ ${p.basisRoot.value.take(12)}")
     }
-    println("\nCode View:\n" + Project.CodeView.render(materialized.graph).content.linesIterator.take(8).mkString("\n"))
+    println("\nCode View:\n" + Project.CodeView.render(materialized.graph).content.linesIterator.take(12).mkString("\n"))
 
   private def writeOrPrint(path: Option[String], content: String): Unit = path match
     case None => println(content)
