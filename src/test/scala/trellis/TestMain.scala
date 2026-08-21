@@ -1,7 +1,5 @@
 package trellis
 
-import trellis.TestSupport.*
-
 object TestMain:
   def main(args: Array[String]): Unit =
     val suites = Vector(

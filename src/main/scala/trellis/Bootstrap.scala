@@ -1,6 +1,5 @@
 package trellis
 
-import java.nio.charset.StandardCharsets
 import trellis.Core.*
 import trellis.Delta.*
 
@@ -8,14 +7,19 @@ import trellis.Delta.*
  * Trellis foundation staircase.
  *
  * F0 is the frozen generic repository/meta substrate constructed by the tiny
- * Scala host. F1 is NOT supplied as a graph snapshot: it is derived by loading
- * the canonical DeltaTrellis resource `/trellis/foundations/F1.delta` and
- * applying that single change to F0.
+ * Scala host. Every successor is supplied only as canonical DeltaTrellis data:
+ *
+ *   F0 + F1.delta = F1
+ *   F1 + F2.delta = F2
+ *
+ * No F1 or F2 graph snapshot is checked in.
  */
 object Bootstrap:
   val F0Root = "6503a6ecb482388edcea4258224e49547da4ece85233687b981d2086d40b13dd"
   val F1ChangeId = "45c76c2d537927e4f0506696b278d86023bf5b694b0401135a93130b59c56fb4"
   val F1Root = "b8fddea20b4dba0ded6493fa70e98650377ea66bed2b0e0363b29a252dd6fe45"
+  val F2ChangeId = "36a8f04e97463c76b74f176c574aa5910099b6d9c562a22e56785bd822488de1"
+  val F2Root = "09cc9ba6664b4e8dd84e4937a2b0cd63ea0863e9c2fdbcdeea27284f89da9496"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -69,6 +73,43 @@ object Bootstrap:
     EntityId("repo.frontier")
   )
 
+  val f2ModeEntities: Set[EntityId] = Set(
+    EntityId("resource.mode.unrestricted"),
+    EntityId("resource.mode.affine"),
+    EntityId("resource.mode.linear")
+  )
+
+  val f2CapabilityEntities: Set[EntityId] = Set(
+    EntityId("resource.capability.pure"),
+    EntityId("resource.capability.own"),
+    EntityId("resource.capability.read"),
+    EntityId("resource.capability.write"),
+    EntityId("resource.capability.suspended")
+  )
+
+  val f2OperationEntities: Set[EntityId] = Set(
+    EntityId("core.move"),
+    EntityId("core.borrow.shared"),
+    EntityId("core.borrow.mut"),
+    EntityId("core.end-borrow"),
+    EntityId("core.drop"),
+    EntityId("core.replicate"),
+    EntityId("core.erase")
+  )
+
+  val f2RuleEntities: Set[EntityId] = Set(
+    EntityId("resource.rule.replicate.unrestricted"),
+    EntityId("resource.rule.erase.unrestricted"),
+    EntityId("resource.rule.erase.affine"),
+    EntityId("resource.rule.move.affine"),
+    EntityId("resource.rule.move.linear"),
+    EntityId("resource.rule.drop.affine"),
+    EntityId("resource.rule.borrow.shared"),
+    EntityId("resource.rule.borrow.mut"),
+    EntityId("resource.rule.end-borrow.shared"),
+    EntityId("resource.rule.end-borrow.mut")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -80,21 +121,43 @@ object Bootstrap:
     require(Canon.graphId(graph).value == F0Root, "F0 construction no longer matches its frozen foundation root")
     graph
 
-  lazy val f1Change: Change =
-    val bytes = readResource("/trellis/foundations/F1.delta")
-    val change = Delta.decodeChangeBytes(bytes).fold(error => throw new IllegalStateException(s"invalid F1.delta: $error"), identity)
-    require(Change.id(change).value == F1ChangeId, "F1.delta no longer matches its frozen change id")
-    change
+  lazy val f1Change: Change = loadFoundationChange("F1", F1ChangeId)
 
   lazy val f1: Graph =
-    val graph = Delta.applyChange(f0, f1Change).fold(error => throw new IllegalStateException(s"cannot derive F1 from F0: $error"), identity)
-    val errors = Check.validate(graph)
-    require(errors.isEmpty, s"derived F1 is invalid: ${errors.mkString("; ")}")
-    require(Canon.graphId(graph).value == F1Root, "derived F1 no longer matches its frozen foundation root")
-    graph
+    deriveFoundation("F1", f0, f1Change, F1Root)
+
+  lazy val f2Change: Change =
+    val change = loadFoundationChange("F2", F2ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F1ChangeId)),
+      "F2.delta must depend exactly on F1.delta"
+    )
+    change
+
+  lazy val f2: Graph =
+    deriveFoundation("F2", f1, f2Change, F2Root)
 
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f1
+  lazy val graph: Graph = f2
+
+  private def loadFoundationChange(name: String, expectedId: String): Change =
+    val bytes = readResource(s"/trellis/foundations/$name.delta")
+    val change = Delta.decodeChangeBytes(bytes).fold(
+      error => throw new IllegalStateException(s"invalid $name.delta: $error"),
+      identity
+    )
+    require(Change.id(change).value == expectedId, s"$name.delta no longer matches its frozen change id")
+    change
+
+  private def deriveFoundation(name: String, predecessor: Graph, change: Change, expectedRoot: String): Graph =
+    val graph = Delta.applyChange(predecessor, change).fold(
+      error => throw new IllegalStateException(s"cannot derive $name from its predecessor: $error"),
+      identity
+    )
+    val errors = Check.validate(graph)
+    require(errors.isEmpty, s"derived $name is invalid: ${errors.mkString("; ")}")
+    require(Canon.graphId(graph).value == expectedRoot, s"derived $name no longer matches its frozen foundation root")
+    graph
 
   private def readResource(path: String): Array[Byte] =
     val stream = Option(getClass.getResourceAsStream(path)).getOrElse {

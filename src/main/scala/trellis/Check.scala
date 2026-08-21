@@ -2,10 +2,147 @@ package trellis
 
 import trellis.Core.*
 
-/** Graph well-formedness and the tiny trusted resource discipline. */
+/** Graph well-formedness plus the tiny generic interpreter for graph-defined resource rules. */
 object Check:
+  enum ResourceDisposition:
+    case Allow, LowerDrop
+
+  final case class StructuralPolicy(duplicate: String, discard: String):
+    def duplicateAllowed: Boolean = duplicate == "allow"
+
+  final case class ResourceRule(
+      entity: EntityId,
+      operation: String,
+      portConstraints: Map[(String, String), String],
+      sameInner: Vector[(String, String)],
+      disposition: ResourceDisposition
+  )
+
+  /**
+   * F2 defines the actual resource table as Trellis graph data. Scala only
+   * interprets a small, generic constraint vocabulary.
+   */
+  object ResourceRules:
+    private val PortPrefix = "port."
+
+    def rules(graph: Graph): Vector[ResourceRule] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "resource.rule").flatMap(node => decodeRule(entity, node).toOption)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "resource.rule").toVector.flatMap { node =>
+          decodeRule(entity, node) match
+            case Left(error) => Vector(s"invalid resource rule ${entity.value}: $error")
+            case Right(_) => Vector.empty
+        }
+      }
+
+    def forOperation(graph: Graph, operation: String): Vector[ResourceRule] =
+      rules(graph).filter(_.operation == operation)
+
+    def structural(graph: Graph, mode: Mode): StructuralPolicy =
+      val name = Canon.encodeMode(mode)
+      graph.entity(EntityId(s"resource.mode.$name")) match
+        case Some(node) if node.kind == "resource.mode" =>
+          StructuralPolicy(
+            node.attrs.getOrElse("duplicate", fallbackDuplicate(mode)),
+            node.attrs.getOrElse("discard", fallbackDiscard(mode))
+          )
+        case _ => StructuralPolicy(fallbackDuplicate(mode), fallbackDiscard(mode))
+
+    def decision(graph: Graph, node: Node): Option[ResourceDisposition] =
+      forOperation(graph, node.kind).find(matches(node, _)).map(_.disposition)
+
+    def explainMismatch(graph: Graph, node: Node): Vector[String] =
+      val candidates = forOperation(graph, node.kind)
+      if candidates.isEmpty then Vector.empty
+      else
+        val failures = candidates.flatMap(rule => mismatchReasons(node, rule).map(reason => s"${rule.entity.value}: $reason"))
+        if failures.isEmpty then Vector(s"no graph-defined resource rule admits ${node.kind}") else failures
+
+    private def decodeRule(entity: EntityId, node: Node): Either[String, ResourceRule] =
+      for
+        operation <- node.attrs.get("operation").toRight(s"${entity.value} lacks operation")
+        disposition <- node.attrs.get("result") match
+          case Some("allow") => Right(ResourceDisposition.Allow)
+          case Some("lower-drop") => Right(ResourceDisposition.LowerDrop)
+          case Some(other) => Left(s"${entity.value} has unknown result $other")
+          case None => Left(s"${entity.value} lacks result")
+        constraints <- decodePortConstraints(node.attrs)
+        sameInner <- decodeSameInner(node.attrs.get("same-inner"))
+      yield ResourceRule(entity, operation, constraints, sameInner, disposition)
+
+    private def decodePortConstraints(attrs: Map[String, String]): Either[String, Map[(String, String), String]] =
+      attrs.toVector.filter(_._1.startsWith(PortPrefix)).foldLeft[Either[String, Map[(String, String), String]]](Right(Map.empty)) {
+        case (acc, (key, value)) =>
+          acc.flatMap { current =>
+            key.stripPrefix(PortPrefix).split("\\.", -1).toVector match
+              case Vector(portName, property)
+                  if portName.nonEmpty && Set("mode", "capability", "direction").contains(property) =>
+                Right(current.updated((portName, property), value))
+              case _ => Left(s"invalid resource-rule constraint key: $key")
+          }
+      }
+
+    private def decodeSameInner(value: Option[String]): Either[String, Vector[(String, String)]] = value match
+      case None => Right(Vector.empty)
+      case Some(raw) =>
+        raw.split(";", -1).toVector.filter(_.nonEmpty).foldLeft[Either[String, Vector[(String, String)]]](Right(Vector.empty)) {
+          (acc, pair) =>
+            acc.flatMap { current =>
+              pair.split(",", -1).toVector match
+                case Vector(a, b) if a.nonEmpty && b.nonEmpty => Right(current :+ (a -> b))
+                case _ => Left(s"invalid same-inner pair: $pair")
+            }
+        }
+
+    private def matches(node: Node, rule: ResourceRule): Boolean = mismatchReasons(node, rule).isEmpty
+
+    private def mismatchReasons(node: Node, rule: ResourceRule): Vector[String] =
+      val ports = node.ports.map(p => p.name -> p).toMap
+      val constraintErrors = rule.portConstraints.toVector.sortBy { case ((port, property), _) => (port, property) }.flatMap {
+        case ((portName, property), expected) =>
+          ports.get(portName) match
+            case None => Vector(s"missing port $portName")
+            case Some(port) =>
+              val actual = property match
+                case "mode" => Some(Canon.encodeMode(port.ty.mode))
+                case "capability" => capabilityOf(port.ty).map(Canon.encodeCapability)
+                case "direction" => Some(Canon.encodeDirection(port.direction))
+                case _ => None
+              if actual.contains(expected) then Vector.empty
+              else Vector(s"$portName.$property expected $expected, found ${actual.getOrElse("none")}")
+      }
+      val innerErrors = rule.sameInner.flatMap { case (a, b) =>
+        (ports.get(a).flatMap(p => innerOf(p.ty)), ports.get(b).flatMap(p => innerOf(p.ty))) match
+          case (Some(left), Some(right)) if left == right => Vector.empty
+          case (Some(_), Some(_)) => Vector(s"$a and $b do not carry the same inner type")
+          case _ => Vector(s"$a and $b must both carry capability inner types")
+      }
+      constraintErrors ++ innerErrors
+
+    private def capabilityOf(ty: Ty): Option[Capability] = ty match
+      case Ty.Cap(kind, _, _, _) => Some(kind)
+      case _ => None
+
+    private def innerOf(ty: Ty): Option[Ty] = ty match
+      case Ty.Cap(_, _, inner, _) => Some(inner)
+      case _ => None
+
+    private def fallbackDuplicate(mode: Mode): String = mode match
+      case Mode.Unrestricted => "allow"
+      case Mode.Affine | Mode.Linear => "forbid"
+
+    private def fallbackDiscard(mode: Mode): String = mode match
+      case Mode.Unrestricted => "allow"
+      case Mode.Affine => "drop"
+      case Mode.Linear => "forbid"
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
+    errors ++= ResourceRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)
@@ -32,39 +169,22 @@ object Check:
       }
     }
 
-    // Non-unrestricted output capabilities may not fan out implicitly.
+    // Structural contraction permission is read from F2 mode definitions when present.
     graph.nodes.foreach { case (id, node) =>
       node.ports.filter(_.direction == Direction.Out).foreach { p =>
         val fanout = graph.outgoing(PortRef(id, p.name)).size
-        if fanout > 1 && !p.ty.mode.duplicateAllowed then
+        if fanout > 1 && !ResourceRules.structural(graph, p.ty.mode).duplicateAllowed then
           errors += s"illegal duplication of ${p.ty.mode} capability at ${id.value.take(8)}.${p.name}"
       }
     }
 
-    graph.nodes.foreach { case (id, node) => errors ++= validateBuiltin(id, node) }
+    graph.nodes.foreach { case (id, node) =>
+      val rules = ResourceRules.forOperation(graph, node.kind)
+      if rules.nonEmpty && ResourceRules.decision(graph, node).isEmpty then
+        val details = ResourceRules.explainMismatch(graph, node).mkString("; ")
+        errors += s"resource operation ${id.value.take(8)} (${node.kind}) violates F2 rules: $details"
+      if node.kind == "core.hole" && !node.attrs.contains("expected") then
+        errors += s"hole ${id.value.take(8)} lacks expected boundary description"
+    }
+
     errors.result()
-
-  private def validateBuiltin(id: ContentId, node: Node): Vector[String] =
-    val p = node.ports.map(x => x.name -> x).toMap
-    node.kind match
-      case "core.replicate" =>
-        p.get("in").toVector.flatMap { in =>
-          if in.ty.mode.duplicateAllowed then Vector.empty else Vector(s"replicate ${id.value.take(8)} requires unrestricted input")
-        }
-      case "core.erase" =>
-        p.get("in").toVector.flatMap { in =>
-          if in.ty.mode.discardAllowed then Vector.empty else Vector(s"erase ${id.value.take(8)} cannot discard linear input")
-        }
-      case "core.borrow.shared" => validateBorrow(id, p, Capability.Read)
-      case "core.borrow.mut" => validateBorrow(id, p, Capability.Write)
-      case "core.hole" =>
-        if node.attrs.contains("expected") then Vector.empty else Vector(s"hole ${id.value.take(8)} lacks expected boundary description")
-      case _ => Vector.empty
-
-  private def validateBorrow(id: ContentId, ports: Map[String, Port], loanKind: Capability): Vector[String] =
-    ports.get("owner") match
-      case Some(Port(_, Direction.In, Ty.Cap(Capability.Own, _, inner, _))) =>
-        ports.get("loan") match
-          case Some(Port(_, Direction.Out, Ty.Cap(kind, _, loanInner, _))) if kind == loanKind && loanInner == inner => Vector.empty
-          case _ => Vector(s"borrow ${id.value.take(8)} has invalid loan port")
-      case _ => Vector(s"borrow ${id.value.take(8)} requires Own<T> input")
