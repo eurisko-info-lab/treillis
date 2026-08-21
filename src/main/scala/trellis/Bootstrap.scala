@@ -14,6 +14,7 @@ import trellis.Delta.*
  *   F2 + F3.delta = F3
  *   F3 + F4.delta = F4
  *   F4 + F5.delta = F5
+ *   F5 + F6.delta = F6
  *
  * No successor graph snapshot is checked in.
  */
@@ -29,6 +30,8 @@ object Bootstrap:
   val F4Root = "616a960470e389c665ab94280b70bb5c7e203ba3b78cdf0b373948a0adf60847"
   val F5ChangeId = "d6fb1fb29f9864cbd8062af1b066270883aa0efcbe8dc405dfd17935fd091368"
   val F5Root = "3516c065b71cce1667a5075625deea2ee88f0e58365ccc21d215e86127b3aab1"
+  val F6ChangeId = "1200106d29fc3cb9ce27647803db8339b3ca66cfdca83abf95756833713ebc20"
+  val F6Root = "478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -217,6 +220,47 @@ object Bootstrap:
     EntityId("projection.rule.typst.entity")
   )
 
+
+  val f6ComponentEntities: Set[EntityId] = Set(
+    EntityId("equality.egraph"),
+    EntityId("equality.eclass"),
+    EntityId("equality.enode"),
+    EntityId("equality.rewrite"),
+    EntityId("equality.pattern"),
+    EntityId("equality.substitution"),
+    EntityId("equality.analysis"),
+    EntityId("equality.invariant"),
+    EntityId("equality.cost-model"),
+    EntityId("equality.extractor"),
+    EntityId("equality.saturation"),
+    EntityId("equality.equivalence"),
+    EntityId("equality.proof")
+  )
+
+  val f6InvariantEntities: Set[EntityId] = Set(
+    EntityId("equality.invariant.type"),
+    EntityId("equality.invariant.resource"),
+    EntityId("equality.invariant.effect"),
+    EntityId("equality.invariant.protocol")
+  )
+
+  val f6CostDimensionEntities: Set[EntityId] = Set(
+    EntityId("equality.cost.nodes"),
+    EntityId("equality.cost.allocations"),
+    EntityId("equality.cost.replication"),
+    EntityId("equality.cost.interactions"),
+    EntityId("equality.cost.peak-memory"),
+    EntityId("equality.cost.communication"),
+    EntityId("equality.cost.critical-path")
+  )
+
+  val f6LawEntities: Set[EntityId] = Set(
+    EntityId("equality.law.reflexive"),
+    EntityId("equality.law.symmetric"),
+    EntityId("equality.law.transitive"),
+    EntityId("equality.law.congruence")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -277,8 +321,19 @@ object Bootstrap:
   lazy val f5: Graph =
     deriveFoundation("F5", f4, f5Change, F5Root)
 
+  lazy val f6Change: Change =
+    val change = loadFoundationChange("F6", F6ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F5ChangeId)),
+      "F6.delta must depend exactly on F5.delta"
+    )
+    change
+
+  lazy val f6: Graph =
+    deriveFoundation("F6", f5, f6Change, F6Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f5
+  lazy val graph: Graph = f6
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")

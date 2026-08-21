@@ -9,29 +9,32 @@ sbt "Test/runMain trellis.TestMain"
 sbt run
 ```
 
-Expected F5 identities:
+Expected F6 identities:
 
 ```text
-F5 delta  d6fb1fb29f9864cbd8062af1b066270883aa0efcbe8dc405dfd17935fd091368
-F5 root   3516c065b71cce1667a5075625deea2ee88f0e58365ccc21d215e86127b3aab1
+F6 delta  1200106d29fc3cb9ce27647803db8339b3ca66cfdca83abf95756833713ebc20
+F6 root   478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1
 ```
 
 The suite must establish:
 
-- canonical F0-F5 staircase derivation;
-- F5 depends exactly on F4;
-- projection components, views, rules, and relationships are graph data;
-- six views and ten render rules are discovered from F5;
-- Code, structure SVG, and Typst rule-driven projections match the pre-F5 oracle;
-- changing F5 projection data changes driven rendering without changing the oracle;
-- specialized ownership/process/machine SVG views are selected by graph-defined filters and retain semantic identifiers.
+- canonical F0-F6 staircase derivation;
+- F6 depends exactly on F5;
+- equality components, invariants, laws, costs, policy, and relationships are graph data;
+- the default rewrite policy requires preservation of type, resource, effect, and protocol semantics;
+- equality closure is symmetric/transitive and recursively congruent;
+- rewrites that omit required resource preservation do not enter an e-class;
+- structural-mode guards are interpreted from rewrite graph data;
+- proof-required policy blocks rewrites without evidence;
+- extraction uses graph-defined multi-objective costs;
+- changing graph policy or cost data changes saturation/extraction without changing Scala mechanics.
 
-Useful projection commands:
+Expected suite size after this slice: **75 tests**.
+
+Useful foundation commands:
 
 ```bash
-sbt "run svg"
-sbt "run svg-ownership"
-sbt "run svg-process"
-sbt "run svg-machine"
-sbt "run typst"
+sbt "run hash-f6"
+sbt "run delta-f6"
+sbt "run dump-f6"
 ```

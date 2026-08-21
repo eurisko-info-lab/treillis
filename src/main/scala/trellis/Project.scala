@@ -92,6 +92,7 @@ object Project:
 
   /** Render any graph-defined F5 view. */
   def renderView(graph: Graph, view: EntityId, selection: Option[Selection] = None): Either[String, Rendered] =
+    selection.foreach(_ => ()) // reserved for selection-scoped rendering; marks are already semantic
     ProjectionRules.view(graph, view).flatMap { spec =>
       spec.format match
         case "code" =>

@@ -2,7 +2,7 @@ package trellis
 
 import trellis.Core.*
 
-/** Graph well-formedness plus the tiny generic interpreter for graph-defined resource rules. */
+/** Graph well-formedness plus tiny generic interpreters for graph-defined foundation policies. */
 object Check:
   enum ResourceDisposition:
     case Allow, LowerDrop
@@ -294,11 +294,314 @@ object Check:
           case None => Left(s"${entity.value} lacks action")
       yield MachineRule(entity, instruction, operation, action)
 
+
+  final case class EqualityTerm(
+      operator: String,
+      mode: Mode = Mode.Unrestricted,
+      children: Vector[EqualityTerm] = Vector.empty
+  )
+
+  final case class EClass(
+      terms: Set[EqualityTerm],
+      saturated: Boolean,
+      iterations: Int
+  )
+
+  final case class EqualityPolicy(
+      requiredPreserve: Set[String],
+      proofRequired: Boolean,
+      maxIterations: Int,
+      maxTerms: Int
+  )
+
+  final case class EqualityRule(
+      entity: EntityId,
+      lhs: String,
+      rhs: String,
+      mode: Option[Mode],
+      preserves: Set[String],
+      evidence: String
+  )
+
+  final case class EqualityCostModel(weights: Map[String, Int])
+
+  final case class EqualityOperator(
+      entity: EntityId,
+      operator: String,
+      metrics: Map[String, Int]
+  )
+
+  /**
+   * F6 owns equality admission and extraction policy as Trellis graph data.
+   *
+   * The host provides only bounded closure, recursive congruence traversal, and
+   * weighted arithmetic. A rewrite is admitted only when its declared
+   * preservation evidence covers every invariant required by the F6 policy and
+   * its optional structural-mode guard matches the rewritten term.
+   */
+  object EqualityRules:
+    val dimensions: Vector[String] = Vector(
+      "nodes",
+      "allocations",
+      "replication",
+      "interactions",
+      "peak-memory",
+      "communication",
+      "critical-path"
+    )
+
+    private val PolicyEntity = EntityId("equality.policy.rewrite")
+    private val CostModelEntity = EntityId("equality.cost-model.default")
+
+    def invariantKeys(graph: Graph): Set[String] =
+      graph.entities.toVector.flatMap { case (_, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "equality.invariant")
+          .flatMap(_.attrs.get("key"))
+      }.toSet
+
+    def costDimensionKeys(graph: Graph): Set[String] =
+      graph.entities.toVector.flatMap { case (_, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "equality.cost-dimension")
+          .flatMap(_.attrs.get("key"))
+      }.toSet
+
+    def policy(graph: Graph): Either[String, EqualityPolicy] =
+      graph.entity(PolicyEntity) match
+        case Some(node) if node.kind == "equality.policy" =>
+          for
+            requiredRaw <- node.attrs.get("required-preserve").toRight("equality rewrite policy lacks required-preserve")
+            required <- parseSet(requiredRaw, "required-preserve")
+            proofRequired <- parseBoolean(node.attrs.get("proof-required"), "proof-required")
+            maxIterations <- parsePositiveInt(node.attrs.get("max-iterations"), "max-iterations")
+            maxTerms <- parsePositiveInt(node.attrs.get("max-terms"), "max-terms")
+          yield EqualityPolicy(required, proofRequired, maxIterations, maxTerms)
+        case Some(node) => Left(s"${PolicyEntity.value} is ${node.kind}, not equality.policy")
+        case None => Left(s"missing ${PolicyEntity.value}")
+
+    def costModel(graph: Graph): Either[String, EqualityCostModel] =
+      graph.entity(CostModelEntity) match
+        case Some(node) if node.kind == "equality.cost-model" =>
+          dimensions.foldLeft[Either[String, Map[String, Int]]](Right(Map.empty)) { (acc, dimension) =>
+            for
+              current <- acc
+              weight <- parseNonNegativeInt(node.attrs.get(dimension), s"cost weight $dimension")
+            yield current.updated(dimension, weight)
+          }.map(EqualityCostModel.apply)
+        case Some(node) => Left(s"${CostModelEntity.value} is ${node.kind}, not equality.cost-model")
+        case None => Left(s"missing ${CostModelEntity.value}")
+
+    def rules(graph: Graph): Vector[EqualityRule] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "equality.rewrite")
+          .flatMap(node => decodeRule(entity, node).toOption)
+      }
+
+    def operators(graph: Graph): Vector[EqualityOperator] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "equality.enode")
+          .flatMap(node => decodeOperator(entity, node).toOption)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val errors = Vector.newBuilder[String]
+
+      if graph.entity(PolicyEntity).isDefined then
+        policy(graph) match
+          case Left(error) => errors += s"invalid equality policy: $error"
+          case Right(value) =>
+            val unknown = value.requiredPreserve -- invariantKeys(graph)
+            if unknown.nonEmpty then
+              errors += s"equality policy references unknown invariants: ${unknown.toVector.sorted.mkString(",")}"
+
+      if graph.entity(CostModelEntity).isDefined then
+        costModel(graph) match
+          case Left(error) => errors += s"invalid equality cost model: $error"
+          case Right(_) =>
+            val missing = dimensions.toSet -- costDimensionKeys(graph)
+            if missing.nonEmpty then
+              errors += s"equality cost model lacks dimension declarations: ${missing.toVector.sorted.mkString(",")}"
+
+      val knownInvariants = invariantKeys(graph)
+      graph.entities.toVector.sortBy(_._1.value).foreach { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).foreach { node =>
+          if node.kind == "equality.rewrite" then
+            decodeRule(entity, node) match
+              case Left(error) => errors += s"invalid equality rewrite ${entity.value}: $error"
+              case Right(rule) =>
+                val unknown = rule.preserves -- knownInvariants
+                if unknown.nonEmpty then
+                  errors += s"invalid equality rewrite ${entity.value}: unknown preserved invariants ${unknown.toVector.sorted.mkString(",")}"
+          else if node.kind == "equality.enode" then
+            decodeOperator(entity, node) match
+              case Left(error) => errors += s"invalid equality enode ${entity.value}: $error"
+              case Right(_) => ()
+        }
+      }
+
+      val duplicates = operators(graph).groupBy(_.operator).toVector.collect {
+        case (operator, defs) if defs.size > 1 => s"ambiguous equality enode cost definition for $operator"
+      }
+      errors ++= duplicates.sorted
+      errors.result()
+
+    def admitted(graph: Graph, rule: EqualityRule, mode: Mode): Either[String, Boolean] =
+      policy(graph).map { value =>
+        rule.mode.forall(_ == mode) &&
+        value.requiredPreserve.subsetOf(rule.preserves) &&
+        (!value.proofRequired || rule.evidence.nonEmpty)
+      }
+
+    def saturate(graph: Graph, seed: EqualityTerm): Either[String, EClass] =
+      val definitionProblems = definitionErrors(graph)
+      if definitionProblems.nonEmpty then Left(definitionProblems.mkString("; "))
+      else
+        for
+          value <- policy(graph)
+        yield
+          val available = rules(graph)
+          var seen = Set(seed)
+          var frontier = Vector(seed)
+          var iterations = 0
+          while frontier.nonEmpty && iterations < value.maxIterations && seen.size < value.maxTerms do
+            val room = value.maxTerms - seen.size
+            val next = frontier
+              .flatMap(term => oneStep(term, available, value))
+              .distinct
+              .filterNot(seen.contains)
+              .sortBy(termKey)
+              .take(room)
+            seen = seen ++ next
+            frontier = next
+            iterations += 1
+          EClass(seen, frontier.isEmpty, iterations)
+
+    def equivalent(graph: Graph, left: EqualityTerm, right: EqualityTerm): Either[String, Boolean] =
+      saturate(graph, left).map(_.terms.contains(right))
+
+    def score(graph: Graph, term: EqualityTerm): Either[String, Long] =
+      val definitionProblems = definitionErrors(graph)
+      if definitionProblems.nonEmpty then Left(definitionProblems.mkString("; "))
+      else
+        costModel(graph).map { model =>
+          val definitions = operators(graph).map(op => op.operator -> op).toMap
+          scoreTerm(term, model, definitions)
+        }
+
+    def extract(graph: Graph, eclass: EClass): Either[String, EqualityTerm] =
+      if eclass.terms.isEmpty then Left("cannot extract from an empty equality class")
+      else
+        val definitionProblems = definitionErrors(graph)
+        if definitionProblems.nonEmpty then Left(definitionProblems.mkString("; "))
+        else
+          costModel(graph).map { model =>
+            val definitions = operators(graph).map(op => op.operator -> op).toMap
+            eclass.terms.toVector
+              .map(term => (scoreTerm(term, model, definitions), termKey(term), term))
+              .sortBy { case (score, key, _) => (score, key) }
+              .head
+              ._3
+          }
+
+    private def oneStep(term: EqualityTerm, available: Vector[EqualityRule], policy: EqualityPolicy): Vector[EqualityTerm] =
+      val root = available.flatMap { rule =>
+        if isAdmitted(rule, policy, term.mode) then
+          if term.operator == rule.lhs then Vector(term.copy(operator = rule.rhs))
+          else if term.operator == rule.rhs then Vector(term.copy(operator = rule.lhs))
+          else Vector.empty
+        else Vector.empty
+      }
+
+      val children = term.children.zipWithIndex.flatMap { case (child, index) =>
+        oneStep(child, available, policy).map { replacement =>
+          term.copy(children = term.children.updated(index, replacement))
+        }
+      }
+
+      (root ++ children).distinct
+
+    private def isAdmitted(rule: EqualityRule, policy: EqualityPolicy, mode: Mode): Boolean =
+      rule.mode.forall(_ == mode) &&
+      policy.requiredPreserve.subsetOf(rule.preserves) &&
+      (!policy.proofRequired || rule.evidence.nonEmpty)
+
+    private def scoreTerm(
+        term: EqualityTerm,
+        model: EqualityCostModel,
+        definitions: Map[String, EqualityOperator]
+    ): Long =
+      val metrics = definitions.get(term.operator) match
+        case Some(definition) => definition.metrics
+        case None => Map("nodes" -> 1)
+      val own = dimensions.iterator.map { dimension =>
+        model.weights.getOrElse(dimension, 0).toLong * metrics.getOrElse(dimension, 0).toLong
+      }.sum
+      own + term.children.iterator.map(child => scoreTerm(child, model, definitions)).sum
+
+    private def termKey(term: EqualityTerm): String =
+      val children = term.children.map(termKey).mkString("(", ",", ")")
+      s"${term.operator}@${Canon.encodeMode(term.mode)}$children"
+
+    private def decodeRule(entity: EntityId, node: Node): Either[String, EqualityRule] =
+      for
+        lhs <- node.attrs.get("lhs").filter(_.nonEmpty).toRight(s"${entity.value} lacks lhs")
+        rhs <- node.attrs.get("rhs").filter(_.nonEmpty).toRight(s"${entity.value} lacks rhs")
+        mode <- decodeModeConstraint(node.attrs.getOrElse("mode", "any"))
+        preserveRaw <- node.attrs.get("preserve").toRight(s"${entity.value} lacks preserve")
+        preserves <- parseSet(preserveRaw, "preserve")
+        evidence <- node.attrs.get("evidence").toRight(s"${entity.value} lacks evidence")
+      yield EqualityRule(entity, lhs, rhs, mode, preserves, evidence)
+
+    private def decodeOperator(entity: EntityId, node: Node): Either[String, EqualityOperator] =
+      for
+        operator <- node.attrs.get("operator").filter(_.nonEmpty).toRight(s"${entity.value} lacks operator")
+        metrics <- dimensions.foldLeft[Either[String, Map[String, Int]]](Right(Map.empty)) { (acc, dimension) =>
+          node.attrs.get(dimension) match
+            case None => acc
+            case Some(raw) =>
+              for
+                current <- acc
+                value <- raw.toIntOption.filter(_ >= 0).toRight(s"${entity.value} has invalid $dimension metric $raw")
+              yield current.updated(dimension, value)
+        }
+      yield EqualityOperator(entity, operator, metrics)
+
+    private def decodeModeConstraint(value: String): Either[String, Option[Mode]] = value match
+      case "any" => Right(None)
+      case "unrestricted" => Right(Some(Mode.Unrestricted))
+      case "affine" => Right(Some(Mode.Affine))
+      case "linear" => Right(Some(Mode.Linear))
+      case other => Left(s"unknown equality rewrite mode $other")
+
+    private def parseSet(raw: String, label: String): Either[String, Set[String]] =
+      val values = raw.split(";", -1).toVector.filter(_.nonEmpty)
+      if values.isEmpty then Left(s"$label must contain at least one key")
+      else if values.distinct.size != values.size then Left(s"$label contains duplicate keys")
+      else Right(values.toSet)
+
+    private def parseBoolean(value: Option[String], label: String): Either[String, Boolean] = value match
+      case Some("true") => Right(true)
+      case Some("false") => Right(false)
+      case Some(other) => Left(s"$label must be true or false, found $other")
+      case None => Left(s"missing $label")
+
+    private def parsePositiveInt(value: Option[String], label: String): Either[String, Int] = value match
+      case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
+      case None => Left(s"missing $label")
+
+    private def parseNonNegativeInt(value: Option[String], label: String): Either[String, Int] = value match
+      case Some(raw) => raw.toIntOption.filter(_ >= 0).toRight(s"$label must be a non-negative integer, found $raw")
+      case None => Left(s"missing $label")
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
     errors ++= ProcessRules.definitionErrors(graph)
     errors ++= MachineRules.definitionErrors(graph)
+    errors ++= EqualityRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)

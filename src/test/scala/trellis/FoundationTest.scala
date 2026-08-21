@@ -185,5 +185,52 @@ object FoundationTest:
       check(Project.ProjectionRules.hasPrimitive(Bootstrap.f5, EntityId("projection.svg"), "edge", "svg-edge"))
       val machineView = Project.ProjectionRules.view(Bootstrap.f5, EntityId("projection.svg.machine")).fold(err => throw new AssertionError(err), identity)
       equal(machineView.attrs.get("node-filter"), Some("entity-prefix:machine."))
+    }),
+    Test("F6 delta is canonical data depending exactly on F5", () => {
+      val change = Bootstrap.f6Change
+      equal(Change.id(change).value, Bootstrap.F6ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F5ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F6 is derived only from F5 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f5, Bootstrap.f6Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f6)))
+      equal(Canon.graphId(derived).value, Bootstrap.F6Root)
+    }),
+    Test("F6 equality components, invariants, costs, and laws are Trellis graph data", () => {
+      val graph = Bootstrap.f6
+      check(Bootstrap.f6ComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f6InvariantEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f6CostDimensionEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f6LawEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f6ComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("equality.component")))
+      Bootstrap.f6InvariantEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("equality.invariant")))
+      Bootstrap.f6CostDimensionEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("equality.cost-dimension")))
+      Bootstrap.f6LawEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("equality.law")))
+      equal(graph.entity(EntityId("equality.engine")).map(_.kind), Some("equality.schema"))
+      equal(graph.entity(EntityId("equality.policy.rewrite")).map(_.kind), Some("equality.policy"))
+      equal(graph.entity(EntityId("equality.cost-model.default")).map(_.kind), Some("equality.cost-model"))
+    }),
+    Test("F6 equality relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f6).isEmpty)
+      val roles = Bootstrap.f6.edges.values.map(_.role).toSet
+      check(Set("equality.component", "equality.invariant", "equality.cost-dimension", "equality.policy", "equality.cost-model", "equality.law").subsetOf(roles))
+      equal(Bootstrap.f6.edges.size, 121)
+    }),
+    Test("F6 rewrite admission and extraction policy comes from graph data", () => {
+      val policy = Check.EqualityRules.policy(Bootstrap.f6).fold(err => throw new AssertionError(err), identity)
+      equal(policy.requiredPreserve, Set("type", "resource", "effect", "protocol"))
+      check(policy.proofRequired)
+      equal(policy.maxIterations, 32)
+      equal(policy.maxTerms, 4096)
+      equal(Check.EqualityRules.invariantKeys(Bootstrap.f6), Set("type", "resource", "effect", "protocol"))
+      val cost = Check.EqualityRules.costModel(Bootstrap.f6).fold(err => throw new AssertionError(err), identity)
+      equal(cost.weights("nodes"), 1)
+      equal(cost.weights("allocations"), 4)
+      equal(cost.weights("replication"), 6)
+      equal(cost.weights("communication"), 8)
+      equal(Check.EqualityRules.costDimensionKeys(Bootstrap.f6), Set(
+        "nodes", "allocations", "replication", "interactions", "peak-memory", "communication", "critical-path"
+      ))
     })
   )
