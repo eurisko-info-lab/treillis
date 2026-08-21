@@ -223,10 +223,82 @@ object Check:
       case "linear" => Right(Mode.Linear)
       case other => Left(s"unknown structural mode $other")
 
+
+  enum MachineAction:
+    case AllocateOwned
+    case MoveOwner
+    case BeginSharedLoan
+    case BeginMutableLoan
+    case EndLoan
+    case DropOwned
+    case ProcessDispatch
+
+  final case class MachineRule(
+      entity: EntityId,
+      instruction: String,
+      operation: String,
+      action: MachineAction
+  )
+
+  /**
+   * F4 maps machine instruction kinds to a tiny trusted set of state-transition
+   * primitives. Scala executes those primitives; the Trellis graph owns the
+   * dispatch table and its semantic operation links.
+   */
+  object MachineRules:
+    def rules(graph: Graph): Vector[MachineRule] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "machine.rule").flatMap(node => decodeRule(entity, node).toOption)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val decoded = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "machine.rule").toVector.map(node => entity -> decodeRule(entity, node))
+      }
+      val malformed = decoded.flatMap { case (entity, result) =>
+        result match
+          case Left(error) => Vector(s"invalid machine rule ${entity.value}: $error")
+          case Right(rule) =>
+            if graph.entity(EntityId(rule.operation)).isDefined then Vector.empty
+            else Vector(s"invalid machine rule ${entity.value}: missing operation ${rule.operation}")
+      }
+      val ambiguous = decoded.collect { case (_, Right(rule)) => rule }
+        .groupBy(_.instruction)
+        .toVector
+        .sortBy(_._1)
+        .flatMap { case (instruction, rs) =>
+          if rs.size <= 1 then Vector.empty
+          else Vector(s"ambiguous machine rules for instruction $instruction")
+        }
+      malformed ++ ambiguous
+
+    def forInstruction(graph: Graph, instruction: String): Option[MachineRule] =
+      rules(graph).find(_.instruction == instruction)
+
+    def decision(graph: Graph, instruction: String): Option[MachineAction] =
+      forInstruction(graph, instruction).map(_.action)
+
+    private def decodeRule(entity: EntityId, node: Node): Either[String, MachineRule] =
+      for
+        instruction <- node.attrs.get("instruction").toRight(s"${entity.value} lacks instruction")
+        operation <- node.attrs.get("operation").toRight(s"${entity.value} lacks operation")
+        action <- node.attrs.get("action") match
+          case Some("allocate-owned") => Right(MachineAction.AllocateOwned)
+          case Some("move-owner") => Right(MachineAction.MoveOwner)
+          case Some("begin-shared-loan") => Right(MachineAction.BeginSharedLoan)
+          case Some("begin-mutable-loan") => Right(MachineAction.BeginMutableLoan)
+          case Some("end-loan") => Right(MachineAction.EndLoan)
+          case Some("drop-owned") => Right(MachineAction.DropOwned)
+          case Some("process-dispatch") => Right(MachineAction.ProcessDispatch)
+          case Some(other) => Left(s"${entity.value} has unknown action $other")
+          case None => Left(s"${entity.value} lacks action")
+      yield MachineRule(entity, instruction, operation, action)
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
     errors ++= ProcessRules.definitionErrors(graph)
+    errors ++= MachineRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)

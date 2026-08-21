@@ -101,5 +101,40 @@ object MachineTest:
       equal(Check.ProcessRules.decision(Bootstrap.f3, "process.send", Some(Mode.Affine)), Some(Check.ProcessDisposition.TransferToChannel))
       equal(Check.ProcessRules.decision(Bootstrap.f3, "process.spawn", Some(Mode.Unrestricted)), Some(Check.ProcessDisposition.ShareWithChild))
       equal(Check.ProcessRules.decision(Bootstrap.f3, "process.spawn", Some(Mode.Linear)), Some(Check.ProcessDisposition.TransferToChild))
+    }),
+    Test("machine transition choices are interpreted from F4 rule data", () => {
+      equal(Check.MachineRules.decision(Bootstrap.f4, "alloc"), Some(Check.MachineAction.AllocateOwned))
+      equal(Check.MachineRules.decision(Bootstrap.f4, "move"), Some(Check.MachineAction.MoveOwner))
+      equal(Check.MachineRules.decision(Bootstrap.f4, "borrow-shared"), Some(Check.MachineAction.BeginSharedLoan))
+      equal(Check.MachineRules.decision(Bootstrap.f4, "send"), Some(Check.MachineAction.ProcessDispatch))
+    }),
+    Test("F4 rule-driven machine stays in parity with the pre-F4 direct oracle", () => {
+      val program = Vector(
+        Instr.Alloc("job", Mode.Affine),
+        Instr.BorrowShared("job", "r"),
+        Instr.EndBorrow("r"),
+        Instr.NewChannel("jobs"),
+        Instr.Send("jobs", "job"),
+        Instr.Recv("jobs", "worker"),
+        Instr.Spawn("child", Vector.empty),
+        Instr.Terminate("child", None),
+        Instr.Join("child", "main")
+      )
+      val driven = right(Machine.run(program, graph = Bootstrap.f4))
+      val direct = right(Machine.runDirect(program, graph = Bootstrap.f3))
+      equal(driven, direct)
+    }),
+    Test("changing F4 dispatch data changes machine admissibility without changing the oracle", () => {
+      val original = Bootstrap.f4.entity(trellis.Core.EntityId("machine.rule.alloc")).getOrElse(
+        throw new AssertionError("missing F4 alloc rule")
+      )
+      val altered = original.copy(attrs = original.attrs.updated("action", "drop-owned"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f4,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(trellis.Core.EntityId("machine.rule.alloc"), altered)), "alter F4 dispatch for test")
+      ).fold(err => throw new AssertionError(err), identity)
+
+      check(Machine.step(State(), Instr.Alloc("x", Mode.Affine), changed).isLeft)
+      check(Machine.stepDirect(State(), Instr.Alloc("x", Mode.Affine), Bootstrap.f3).isRight)
     })
   )

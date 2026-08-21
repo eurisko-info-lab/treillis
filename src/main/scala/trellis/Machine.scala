@@ -2,14 +2,15 @@ package trellis
 
 import scala.collection.immutable.Queue
 import trellis.Core.*
-import trellis.Check.ProcessDisposition
+import trellis.Check.{MachineAction, ProcessDisposition}
 
 /**
  * Small CESK-R-flavoured reference resource/process machine.
  *
- * Scala provides generic process tables, queues, resource bookkeeping, and rule
- * dispatch. F3 graph data decides which process transitions are legal and how
- * structural modes affect send/spawn/join/termination.
+ * Scala provides generic process tables, queues, resource bookkeeping, and a
+ * tiny trusted transition primitive set. F4 graph data dispatches machine
+ * instructions to those primitives; F2/F3 continue to define resource/process
+ * policy beneath them.
  */
 object Machine:
   enum Owner:
@@ -57,7 +58,23 @@ object Machine:
   def run(program: Vector[Instr], initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
     program.foldLeft[Either[String, State]](Right(initial))((s, i) => s.flatMap(step(_, i, graph)))
 
-  def step(s: State, i: Instr, graph: Graph = Bootstrap.graph): Either[String, State] = i match
+  /**
+   * F4 rule-driven dispatcher. The graph selects a trusted primitive action for
+   * each instruction kind; Scala only executes that small primitive set.
+   */
+  def step(s: State, i: Instr, graph: Graph = Bootstrap.graph): Either[String, State] =
+    for
+      rule <- Check.MachineRules.forInstruction(graph, instructionKey(i)).toRight(
+        s"no F4 machine rule for ${instructionKey(i)}"
+      )
+      next <- executeRule(s, i, rule.action, graph)
+    yield next
+
+  /** Pre-F4 direct dispatcher retained as a parity oracle for bootstrap closure. */
+  def runDirect(program: Vector[Instr], initial: State = State(), graph: Graph = Bootstrap.f3): Either[String, State] =
+    program.foldLeft[Either[String, State]](Right(initial))((s, i) => s.flatMap(stepDirect(_, i, graph)))
+
+  def stepDirect(s: State, i: Instr, graph: Graph = Bootstrap.f3): Either[String, State] = i match
     case Instr.Alloc(name, mode) =>
       if s.resources.contains(name) then Left(s"resource $name already exists")
       else Right(s.copy(
@@ -153,6 +170,36 @@ object Machine:
     case Instr.Terminate(process, result) => terminate(s, process, result, graph)
 
     case Instr.Join(child, into) => join(s, child, into, graph)
+
+  private def instructionKey(i: Instr): String = i match
+    case Instr.Alloc(_, _) => "alloc"
+    case Instr.Move(_, _) => "move"
+    case Instr.BorrowShared(_, _) => "borrow-shared"
+    case Instr.BorrowMut(_, _) => "borrow-mut"
+    case Instr.EndBorrow(_) => "end-borrow"
+    case Instr.Drop(_) => "drop"
+    case Instr.NewChannel(_) => "new-channel"
+    case Instr.Send(_, _) => "send"
+    case Instr.Recv(_, _) => "receive"
+    case Instr.Spawn(_, _) => "spawn"
+    case Instr.Terminate(_, _) => "terminate"
+    case Instr.Join(_, _) => "join"
+
+  private def executeRule(s: State, i: Instr, action: MachineAction, graph: Graph): Either[String, State] =
+    (action, i) match
+      case (MachineAction.AllocateOwned, Instr.Alloc(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.MoveOwner, Instr.Move(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.BeginSharedLoan, Instr.BorrowShared(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.BeginMutableLoan, Instr.BorrowMut(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.EndLoan, Instr.EndBorrow(_)) => stepDirect(s, i, graph)
+      case (MachineAction.DropOwned, Instr.Drop(_)) => stepDirect(s, i, graph)
+      case (MachineAction.ProcessDispatch, Instr.NewChannel(_)) => stepDirect(s, i, graph)
+      case (MachineAction.ProcessDispatch, Instr.Send(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.ProcessDispatch, Instr.Recv(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.ProcessDispatch, Instr.Spawn(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.ProcessDispatch, Instr.Terminate(_, _)) => stepDirect(s, i, graph)
+      case (MachineAction.ProcessDispatch, Instr.Join(_, _)) => stepDirect(s, i, graph)
+      case _ => Left(s"F4 action $action is incompatible with ${instructionKey(i)}")
 
   private def send(s: State, channel: String, r: Resource, disposition: ProcessDisposition): Either[String, State] =
     val waiters = s.waiting.getOrElse(channel, Queue.empty)

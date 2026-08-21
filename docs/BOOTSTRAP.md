@@ -1,31 +1,16 @@
-# Trellis bootstrap boundary
+# Trellis Bootstrap
 
-The Scala host remains intentionally tiny. It provides:
+The Scala host remains intentionally small. It provides the generic graph/CAS/change substrate, validation, a tiny trusted transition-primitive set, repository mechanics, projections, and the bootstrap interpreter.
 
-- the generic graph substrate;
-- canonical encoding and hashing;
-- DeltaTrellis decoding/application;
-- the Pijul-like change DAG and branch mechanics;
-- graph well-formedness;
-- generic interpreters for graph-defined resource and process rules;
-- CESK-R reference bookkeeping, queues, scheduling state, and projections.
-
-Concrete Trellis vocabulary should migrate upward into the foundation staircase rather than outward into new Scala cases.
-
-## Current staircase
+The foundation staircase is data-derived:
 
 ```text
-F0  repository/meta substrate
- |
- +-- F1.delta --> F1 semantic schema
-                    |
-                    +-- F2.delta --> F2 resource calculus
-                                       |
-                                       +-- F3.delta --> F3 process/channel calculus
+F0 + F1.delta = F1   semantic schema
+F1 + F2.delta = F2   resource calculus
+F2 + F3.delta = F3   process/channel calculus
+F3 + F4.delta = F4   CESK-R transition semantics
 ```
 
-F2 is the first foundation whose definitions directly drive host behavior: resource-operation legality and structural duplication policy are read from F2 graph nodes.
+No F1/F2/F3/F4 graph snapshots are checked in. Each successor is reconstructed from its predecessor plus one canonical DeltaTrellis change.
 
-F3 extends that boundary to concurrency. Channel endpoint modes and the transition policy for channel creation, send, receive, spawn, join, and process termination are Trellis graph data. Scala retains generic process tables, queues, ownership bookkeeping, and dispatch of the dispositions named by F3.
-
-The next intended successor is F4, which should lift the remaining CESK-R transition vocabulary and continuation/resource-frame semantics into graph-defined machine rules.
+F4 is the first machine-semantics foundation. The Trellis graph owns the instruction-to-transition-primitive dispatch table. Scala executes only the small trusted primitive vocabulary and keeps the old F3 direct dispatcher temporarily as a parity oracle.

@@ -114,5 +114,38 @@ object FoundationTest:
       equal(Check.ProcessRules.endpointMode(Bootstrap.f3, EntityId("process.capability.send")), Right(Mode.Unrestricted))
       equal(Check.ProcessRules.endpointMode(Bootstrap.f3, EntityId("process.capability.recv")), Right(Mode.Affine))
       equal(Check.ProcessRules.endpointMode(Bootstrap.f3, EntityId("process.capability.handle")), Right(Mode.Affine))
+    }),
+    Test("F4 delta is canonical data depending exactly on F3", () => {
+      val change = Bootstrap.f4Change
+      equal(Change.id(change).value, Bootstrap.F4ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F3ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F4 is derived only from F3 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f3, Bootstrap.f4Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f4)))
+      equal(Canon.graphId(derived).value, Bootstrap.F4Root)
+    }),
+    Test("F4 machine state components and transition rules are Trellis graph data", () => {
+      val graph = Bootstrap.f4
+      check(Bootstrap.f4ComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f4RuleEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f4ComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("machine.component")))
+      Bootstrap.f4RuleEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("machine.rule")))
+      equal(Check.MachineRules.rules(graph).size, 12)
+    }),
+    Test("F4 machine relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f4).isEmpty)
+      val roles = Bootstrap.f4.edges.values.map(_.role).toSet
+      check(Set("machine.component", "machine.operation").subsetOf(roles))
+      equal(Bootstrap.f4.edges.size, 74)
+    }),
+    Test("F4 dispatch table covers every reference-machine instruction kind", () => {
+      val instructions = Check.MachineRules.rules(Bootstrap.f4).map(_.instruction).toSet
+      equal(
+        instructions,
+        Set("alloc", "move", "borrow-shared", "borrow-mut", "end-borrow", "drop",
+          "new-channel", "send", "receive", "spawn", "terminate", "join")
+      )
     })
   )
