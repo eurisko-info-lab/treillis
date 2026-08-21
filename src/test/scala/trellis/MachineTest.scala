@@ -136,5 +136,88 @@ object MachineTest:
 
       check(Machine.step(State(), Instr.Alloc("x", Mode.Affine), changed).isLeft)
       check(Machine.stepDirect(State(), Instr.Alloc("x", Mode.Affine), Bootstrap.f3).isRight)
+    }),
+    Test("F7 lowering maps machine instructions to graph-defined DeltaNet agent kinds", () => {
+      val net = right(Machine.DeltaNet.lower(Vector(
+        Instr.Alloc("x", Mode.Affine),
+        Instr.NewChannel("jobs"),
+        Instr.Send("jobs", "x"),
+        Instr.Recv("jobs", "worker")
+      ), Bootstrap.f7))
+      equal(
+        net.agents.map(_.kind),
+        Vector(
+          trellis.Core.EntityId("deltanet.agent-kind.alloc"),
+          trellis.Core.EntityId("deltanet.agent-kind.channel"),
+          trellis.Core.EntityId("deltanet.agent-kind.send"),
+          trellis.Core.EntityId("deltanet.agent-kind.receive")
+        )
+      )
+    }),
+    Test("F7 DeltaNet lowering and readback stay in parity with CESK-R", () => {
+      val program = Vector(
+        Instr.Alloc("job", Mode.Affine),
+        Instr.NewChannel("jobs"),
+        Instr.Send("jobs", "job"),
+        Instr.Recv("jobs", "worker"),
+        Instr.Spawn("child", Vector.empty),
+        Instr.Terminate("child", None),
+        Instr.Join("child", "main")
+      )
+      val net = right(Machine.DeltaNet.run(program, graph = Bootstrap.f7))
+      val ceskr = right(Machine.run(program, graph = Bootstrap.f7))
+      equal(net, ceskr)
+    }),
+    Test("changing F7 lowering data changes the net without changing CESK-R", () => {
+      val entity = trellis.Core.EntityId("deltanet.lower.alloc")
+      val original = Bootstrap.f7.entity(entity).getOrElse(throw new AssertionError("missing F7 alloc lowering"))
+      val altered = original.copy(attrs = original.attrs.updated("agent", "deltanet.agent-kind.move"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f7,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "alter F7 lowering for test")
+      ).fold(err => throw new AssertionError(err), identity)
+      val net = right(Machine.DeltaNet.lower(Vector(Instr.Alloc("x", Mode.Affine)), changed))
+      equal(net.agents.head.kind, trellis.Core.EntityId("deltanet.agent-kind.move"))
+      check(Machine.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isRight)
+    }),
+    Test("F7 replicator permits unrestricted duplication and rejects affine duplication", () => {
+      val duplicated = right(Machine.DeltaNet.structural("x", Mode.Unrestricted, 2, Bootstrap.f7))
+      equal(duplicated.outputs, Vector("x.0", "x.1"))
+      equal(duplicated.interactions, 1)
+      check(Machine.DeltaNet.structural("x", Mode.Affine, 2, Bootstrap.f7).isLeft)
+      check(Machine.DeltaNet.structural("x", Mode.Linear, 2, Bootstrap.f7).isLeft)
+    }),
+    Test("F7 eraser performs unrestricted erase and affine drop but rejects linear erase", () => {
+      val erased = right(Machine.DeltaNet.structural("u", Mode.Unrestricted, 0, Bootstrap.f7))
+      val dropped = right(Machine.DeltaNet.structural("a", Mode.Affine, 0, Bootstrap.f7))
+      equal(erased.trace, Vector("erase u"))
+      equal(dropped.trace, Vector("drop a"))
+      check(Machine.DeltaNet.structural("l", Mode.Linear, 0, Bootstrap.f7).isLeft)
+    }),
+    Test("F7 channel and process active-pair actions are graph-defined", () => {
+      import trellis.Core.EntityId
+      equal(
+        Machine.DeltaNet.interactionAction(EntityId("deltanet.agent-kind.send"), EntityId("deltanet.agent-kind.channel"), None, Bootstrap.f7),
+        Some(Check.DeltaNetAction.Enqueue)
+      )
+      equal(
+        Machine.DeltaNet.interactionAction(EntityId("deltanet.agent-kind.receive"), EntityId("deltanet.agent-kind.channel"), None, Bootstrap.f7),
+        Some(Check.DeltaNetAction.DequeueOrBlock)
+      )
+      equal(
+        Machine.DeltaNet.interactionAction(EntityId("deltanet.agent-kind.spawn"), EntityId("deltanet.agent-kind.process"), None, Bootstrap.f7),
+        Some(Check.DeltaNetAction.SplitContext)
+      )
+    }),
+    Test("F7 preservation policy can reject lowering while CESK-R remains unchanged", () => {
+      val entity = trellis.Core.EntityId("deltanet.lower.alloc")
+      val original = Bootstrap.f7.entity(entity).getOrElse(throw new AssertionError("missing F7 alloc lowering"))
+      val altered = original.copy(attrs = original.attrs.updated("preserves", "type;effect;protocol"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f7,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "remove resource preservation for test")
+      ).fold(err => throw new AssertionError(err), identity)
+      check(Machine.DeltaNet.lower(Vector(Instr.Alloc("x", Mode.Affine)), changed).isLeft)
+      check(Machine.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isRight)
     })
   )

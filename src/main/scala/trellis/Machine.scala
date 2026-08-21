@@ -367,6 +367,129 @@ object Machine:
       case "forbid" => Left(s"process cannot terminate with live ${r.mode} resource ${r.name}")
       case other => Left(s"unknown structural discard policy $other for ${r.mode}")
 
+
+  /**
+   * F7 DeltaNet bootstrap.
+   *
+   * Lowering and interaction selection are graph-defined. The first reducer
+   * intentionally reuses F4 CESK-R transition primitives after lowering so the
+   * bootstrap can establish lowering/readback parity before a later foundation
+   * replaces those primitives with a fully independent interaction reducer.
+   * Structural replicator/eraser interactions are already reduced directly.
+   */
+  object DeltaNet:
+    final case class Agent(
+        id: Int,
+        kind: EntityId,
+        instructionKey: String,
+        instruction: Instr
+    )
+
+    final case class Net(
+        agents: Vector[Agent],
+        trace: Vector[String] = Vector.empty
+    )
+
+    final case class StructuralResult(
+        outputs: Vector[String],
+        interactions: Int,
+        trace: Vector[String]
+    )
+
+    def lower(program: Vector[Instr], graph: Graph = Bootstrap.graph): Either[String, Net] =
+      for
+        policy <- Check.DeltaNetRules.policy(graph)
+        _ <- expect(policy.scheduler == "stable-agent-id", s"unsupported DeltaNet scheduler ${policy.scheduler}")
+        agents <- program.zipWithIndex.foldLeft[Either[String, Vector[Agent]]](Right(Vector.empty)) {
+          case (acc, (instruction, index)) =>
+            for
+              current <- acc
+              key = instructionKeyOf(instruction)
+              rule <- Check.DeltaNetRules.loweringForInstruction(graph, key).toRight(s"no F7 DeltaNet lowering for $key")
+              admitted <- Check.DeltaNetRules.admittedLowering(graph, rule)
+              _ <- expect(admitted, s"F7 DeltaNet lowering ${rule.entity.value} is not admitted")
+            yield current :+ Agent(index, rule.agent, key, instruction)
+        }
+      yield Net(agents, agents.map(agent => s"lower ${agent.instructionKey} -> ${agent.kind.value}"))
+
+    def reduce(net: Net, initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
+      for
+        policy <- Check.DeltaNetRules.policy(graph)
+        _ <- expect(policy.scheduler == "stable-agent-id", s"unsupported DeltaNet scheduler ${policy.scheduler}")
+        _ <- expect(net.agents.size <= policy.maxInteractions, s"DeltaNet interaction budget exceeded: ${net.agents.size} > ${policy.maxInteractions}")
+        reduced <- net.agents.sortBy(_.id).foldLeft[Either[String, State]](Right(initial)) { (acc, agent) =>
+          acc.flatMap(state => Machine.step(state, agent.instruction, graph))
+        }
+        _ <- expect(policy.readback == "ceskr-state", s"unsupported DeltaNet readback ${policy.readback}")
+      yield reduced
+
+    def run(program: Vector[Instr], initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
+      lower(program, graph).flatMap(net => reduce(net, initial, graph))
+
+    def interactionAction(
+        left: EntityId,
+        right: EntityId,
+        mode: Option[Mode],
+        graph: Graph = Bootstrap.graph
+    ): Option[Check.DeltaNetAction] =
+      Check.DeltaNetRules.interaction(graph, left, right, mode)
+
+    /**
+     * Direct local structural interaction. `uses` is intentionally limited to
+     * 0/1/2 in F7: erasure, identity wiring, or one binary replicator.
+     */
+    def structural(
+        name: String,
+        mode: Mode,
+        uses: Int,
+        graph: Graph = Bootstrap.graph
+    ): Either[String, StructuralResult] =
+      for
+        policy <- Check.DeltaNetRules.structuralPolicy(graph)
+        result <- uses match
+          case 0 =>
+            Check.DeltaNetRules.interaction(
+              graph,
+              policy.eraseAgent,
+              EntityId("deltanet.agent-kind.value"),
+              Some(mode)
+            ) match
+              case Some(Check.DeltaNetAction.Erase) =>
+                Right(StructuralResult(Vector.empty, 1, Vector(s"erase $name")))
+              case Some(Check.DeltaNetAction.Drop) =>
+                Right(StructuralResult(Vector.empty, 1, Vector(s"drop $name")))
+              case Some(other) => Left(s"invalid F7 eraser interaction action $other")
+              case None => Left(s"no F7 eraser interaction for ${Canon.encodeMode(mode)}")
+          case 1 =>
+            Right(StructuralResult(Vector(name), 0, Vector(s"wire $name")))
+          case 2 =>
+            Check.DeltaNetRules.interaction(
+              graph,
+              policy.duplicateAgent,
+              EntityId("deltanet.agent-kind.value"),
+              Some(mode)
+            ) match
+              case Some(Check.DeltaNetAction.Duplicate) =>
+                Right(StructuralResult(Vector(s"$name.0", s"$name.1"), 1, Vector(s"replicate $name")))
+              case Some(other) => Left(s"invalid F7 replicator interaction action $other")
+              case None => Left(s"no F7 replicator interaction for ${Canon.encodeMode(mode)}")
+          case other => Left(s"F7 structural net supports 0, 1, or 2 uses, found $other")
+      yield result
+
+    private def instructionKeyOf(i: Instr): String = i match
+      case Instr.Alloc(_, _) => "alloc"
+      case Instr.Move(_, _) => "move"
+      case Instr.BorrowShared(_, _) => "borrow-shared"
+      case Instr.BorrowMut(_, _) => "borrow-mut"
+      case Instr.EndBorrow(_) => "end-borrow"
+      case Instr.Drop(_) => "drop"
+      case Instr.NewChannel(_) => "new-channel"
+      case Instr.Send(_, _) => "send"
+      case Instr.Recv(_, _) => "receive"
+      case Instr.Spawn(_, _) => "spawn"
+      case Instr.Terminate(_, _) => "terminate"
+      case Instr.Join(_, _) => "join"
+
   private def processDecision(graph: Graph, operation: String, mode: Option[Mode]): Either[String, ProcessDisposition] =
     Check.ProcessRules.decision(graph, operation, mode).toRight {
       val suffix = mode.map(m => s"/${Canon.encodeMode(m)}").getOrElse("")

@@ -10,6 +10,7 @@ F0
   + F4.delta -> F4
   + F5.delta -> F5
   + F6.delta -> F6
+  + F7.delta -> F7
 ```
 
 Frozen identities:
@@ -28,21 +29,37 @@ F5 delta  d6fb1fb29f9864cbd8062af1b066270883aa0efcbe8dc405dfd17935fd091368
 F5 root   3516c065b71cce1667a5075625deea2ee88f0e58365ccc21d215e86127b3aab1
 F6 delta  1200106d29fc3cb9ce27647803db8339b3ca66cfdca83abf95756833713ebc20
 F6 root   478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1
+F7 delta  b1e91c7e639bd57a1e968927a901e3f694749d1f4d67cf16a5c19c57be72bff9
+F7 root   efcbbe6b6f335ebfcf67a1894d51aef35869d54e94da77b26b4700c68660750b
 ```
 
-## F6: resource-aware equality saturation
+## F7: DeltaNet lowering and local interaction semantics
 
-F6 moves semantic equivalence admission and extraction policy into Trellis data. It defines:
+F7 introduces the local-interaction execution layer as Trellis graph data. It defines:
 
-- EGraph, EClass, ENode, Rewrite, Pattern, Substitution, Analysis, Invariant, CostModel, Extractor, Saturation, Equivalence, and ProofEvidence as equality components;
-- type, resource, effect, and protocol preservation invariants;
-- reflexive, symmetric, transitive, and congruence laws as graph data;
-- a constitutional rewrite policy requiring all four invariants, proof evidence, bounded saturation, and F2 structural-mode guards;
-- seven extraction-cost dimensions: nodes, allocations, replication, interactions, peak memory, communication, and critical path;
-- a graph-defined default weighted cost model.
+- Net, Agent, Wire, PrincipalPort, AuxiliaryPort, ActivePair, Interaction, Lowering, Readback, and Scheduler components;
+- fifteen first-class agent kinds, including value, replicator, eraser, channel, process, allocation, movement, borrow, send/receive, spawn/terminate, and join agents;
+- twelve machine-instruction lowering rules, covering every F4 instruction kind;
+- seven active-pair rules for unrestricted replication, unrestricted erasure, affine drop, send/channel, receive/channel, spawn/process, and join/process interactions;
+- an execution policy requiring preservation of the four F6 invariants, preservation evidence, a bounded interaction budget, deterministic stable-agent scheduling, and CESK-R state readback;
+- a structural policy mapping F2 modes to explicit replicator/eraser behavior.
 
-The tiny host does not hard-code Trellis rewrites. Local/package graphs may add `equality.rewrite` nodes. The generic kernel reads their left/right operator names, structural-mode guard, preservation claims, and evidence reference, then constructs bounded equivalence classes under symmetric/transitive closure and recursive congruence.
+The lowering rules point by typed semantic edges to both their source operation and target agent kind. Active-pair rules point to their participating agent kinds and, for structural interactions, the relevant F2 mode. The execution policy points to the F6 type/resource/effect/protocol invariants.
 
-`equality.enode` nodes may provide operator cost metrics. Extraction recursively scores representatives with the graph-defined cost model and chooses the deterministic minimum.
+F7 already executes structural net interactions directly:
 
-There is no `F6.graph` snapshot in the repository. The only successor material is `F6.delta`.
+```text
+unrestricted value + replicator -> two value uses
+affine value + replicator       -> forbidden
+linear value + replicator       -> forbidden
+
+unrestricted value + eraser     -> erase
+affine value + eraser           -> deterministic drop
+linear value + eraser           -> forbidden
+```
+
+For the non-structural instruction fragment, F7 first lowers into graph-selected DeltaNet agents, schedules those agents deterministically, and then delegates the primitive state transition to the F4 CESK-R executor. Differential tests require readback parity between this path and direct F4 execution.
+
+This is intentional bootstrap staging: F7 freezes the lowering and interaction contract first. A later foundation can replace primitive delegation with an independent interaction reducer while retaining the same graph-defined semantics.
+
+There is no `F7.graph` snapshot in the repository. The only successor material is `F7.delta`.

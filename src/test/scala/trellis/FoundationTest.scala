@@ -232,5 +232,52 @@ object FoundationTest:
       equal(Check.EqualityRules.costDimensionKeys(Bootstrap.f6), Set(
         "nodes", "allocations", "replication", "interactions", "peak-memory", "communication", "critical-path"
       ))
+    }),
+    Test("F7 delta is canonical data depending exactly on F6", () => {
+      val change = Bootstrap.f7Change
+      equal(Change.id(change).value, Bootstrap.F7ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F6ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F7 is derived only from F6 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f6, Bootstrap.f7Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f7)))
+      equal(Canon.graphId(derived).value, Bootstrap.F7Root)
+    }),
+    Test("F7 DeltaNet components, agent kinds, lowerings, and interactions are Trellis graph data", () => {
+      val graph = Bootstrap.f7
+      check(Bootstrap.f7ComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f7AgentKindEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f7LoweringEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f7InteractionEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f7ComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.component")))
+      Bootstrap.f7AgentKindEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.agent-kind")))
+      Bootstrap.f7LoweringEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.lowering-rule")))
+      Bootstrap.f7InteractionEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.interaction-rule")))
+      equal(Check.DeltaNetRules.lowerings(graph).size, 12)
+      equal(Check.DeltaNetRules.interactions(graph).size, 7)
+    }),
+    Test("F7 DeltaNet relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f7).isEmpty)
+      val roles = Bootstrap.f7.edges.values.map(_.role).toSet
+      check(Set("deltanet.component", "deltanet.policy", "deltanet.invariant", "deltanet.mode", "deltanet.operation", "deltanet.agent-kind").subsetOf(roles))
+      equal(Bootstrap.f7.edges.size, 181)
+    }),
+    Test("F7 lowering, scheduling, readback, and structural policy comes from graph data", () => {
+      val policy = Check.DeltaNetRules.policy(Bootstrap.f7).fold(err => throw new AssertionError(err), identity)
+      equal(policy.requiredPreserve, Set("type", "resource", "effect", "protocol"))
+      check(policy.proofRequired)
+      equal(policy.maxInteractions, 4096)
+      equal(policy.scheduler, "stable-agent-id")
+      equal(policy.readback, "ceskr-state")
+      val structural = Check.DeltaNetRules.structuralPolicy(Bootstrap.f7).fold(err => throw new AssertionError(err), identity)
+      equal(structural.duplicateAgent, EntityId("deltanet.agent-kind.replicator"))
+      equal(structural.eraseAgent, EntityId("deltanet.agent-kind.eraser"))
+      equal((structural.unrestrictedDiscard, structural.affineDiscard, structural.linearDiscard), ("erase", "drop", "forbid"))
+      equal(
+        Check.DeltaNetRules.lowerings(Bootstrap.f7).map(_.instruction).toSet,
+        Set("alloc", "move", "borrow-shared", "borrow-mut", "end-borrow", "drop",
+          "new-channel", "send", "receive", "spawn", "terminate", "join")
+      )
     })
   )

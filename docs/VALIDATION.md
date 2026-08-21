@@ -9,32 +9,46 @@ sbt "Test/runMain trellis.TestMain"
 sbt run
 ```
 
-Expected F6 identities:
+Expected F7 identities:
 
 ```text
-F6 delta  1200106d29fc3cb9ce27647803db8339b3ca66cfdca83abf95756833713ebc20
-F6 root   478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1
+F7 delta  b1e91c7e639bd57a1e968927a901e3f694749d1f4d67cf16a5c19c57be72bff9
+F7 root   efcbbe6b6f335ebfcf67a1894d51aef35869d54e94da77b26b4700c68660750b
+```
+
+Expected materialized F7 size:
+
+```text
+nodes      196
+edges      181
+entities   196
+lowerings   12
+interactions 7
 ```
 
 The suite must establish:
 
-- canonical F0-F6 staircase derivation;
-- F6 depends exactly on F5;
-- equality components, invariants, laws, costs, policy, and relationships are graph data;
-- the default rewrite policy requires preservation of type, resource, effect, and protocol semantics;
-- equality closure is symmetric/transitive and recursively congruent;
-- rewrites that omit required resource preservation do not enter an e-class;
-- structural-mode guards are interpreted from rewrite graph data;
-- proof-required policy blocks rewrites without evidence;
-- extraction uses graph-defined multi-objective costs;
-- changing graph policy or cost data changes saturation/extraction without changing Scala mechanics.
+- canonical F0-F7 staircase derivation;
+- F7 depends exactly on F6;
+- DeltaNet components, agent kinds, lowerings, interactions, policies, and relationships are graph data;
+- the twelve F4 instruction kinds are covered by graph-defined lowering rules;
+- lowering rules preserve every invariant required by the F7 execution policy and carry evidence;
+- stable-agent scheduling and CESK-R readback are selected from graph data;
+- changing an F7 lowering changes the produced net without changing CESK-R host mechanics;
+- DeltaNet lowering/readback stays in parity with F4 CESK-R for the covered instruction fragment;
+- unrestricted duplication reduces through a replicator;
+- affine and linear duplication are rejected;
+- unrestricted erasure and affine drop reduce through the eraser policy;
+- linear erasure is rejected;
+- send/channel, receive/channel, spawn/process, and join/process active-pair actions are graph-defined;
+- removing required resource-preservation evidence can reject DeltaNet lowering while leaving CESK-R unchanged.
 
-Expected suite size after this slice: **75 tests**.
+Expected suite size after this slice: **87 tests**.
 
 Useful foundation commands:
 
 ```bash
-sbt "run hash-f6"
-sbt "run delta-f6"
-sbt "run dump-f6"
+sbt "run hash-f7"
+sbt "run delta-f7"
+sbt "run dump-f7"
 ```

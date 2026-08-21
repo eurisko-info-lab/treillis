@@ -1,8 +1,8 @@
 # Bootstrap
 
-The Scala bootstrap is intentionally small. It supplies canonical graph/change encoding, repository mechanics, generic validation, a reference machine primitive executor, semantic navigation, primitive projection rendering, and a bounded equality-saturation kernel.
+The Scala bootstrap is intentionally small. It supplies canonical graph/change encoding, repository mechanics, generic validation, CESK-R transition primitives, semantic navigation, primitive projection rendering, bounded equality closure, and the first generic DeltaNet lowering/reduction substrate.
 
-The current foundation is F6 and is reconstructed at startup from the frozen staircase:
+The current foundation is F7 and is reconstructed at startup from the frozen staircase:
 
 ```text
 F0 + F1.delta -> F1
@@ -11,12 +11,15 @@ F2 + F3.delta -> F3
 F3 + F4.delta -> F4
 F4 + F5.delta -> F5
 F5 + F6.delta -> F6
+F6 + F7.delta -> F7
 ```
 
-No F1-F6 graph snapshot is supplied.
+No F1-F7 graph snapshot is supplied.
 
-F6 makes equality admission and extraction policy graph-resident. `Check.scala` interprets `equality.rewrite`, `equality.enode`, invariant, policy, and cost-model nodes. The host retains only bounded closure, recursive congruence traversal, and weighted cost arithmetic.
+F7 moves DeltaNet vocabulary, agent kinds, machine-to-net lowering, local active-pair selection, structural replication/erasure policy, scheduling, invariant preservation, and readback policy into Trellis data.
 
-A rewrite enters an e-class only when its declared preservation set covers the invariants required by `equality.policy.rewrite`, its structural-mode guard matches, and the graph-defined proof policy is satisfied. Extraction uses the seven graph-defined cost dimensions and weights.
+The F7 reducer is deliberately transitional. Graph-defined lowering is real, and replicator/eraser structural interactions reduce directly as local net interactions. Non-structural instruction agents currently delegate their primitive state transition to the F4 CESK-R executor after lowering. This provides a differential parity bridge rather than prematurely duplicating the full machine semantics in Scala.
+
+A later foundation can replace that delegated primitive executor with a fully independent interaction reducer without changing the F7 lowering contract.
 
 Current bootstrap roots and delta IDs are printed by `sbt run` and can be queried individually with `hash-fN` and `delta-fN` commands.

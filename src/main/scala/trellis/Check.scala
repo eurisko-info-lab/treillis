@@ -596,12 +596,265 @@ object Check:
       case Some(raw) => raw.toIntOption.filter(_ >= 0).toRight(s"$label must be a non-negative integer, found $raw")
       case None => Left(s"missing $label")
 
+
+  final case class DeltaNetPolicy(
+      requiredPreserve: Set[String],
+      proofRequired: Boolean,
+      maxInteractions: Int,
+      scheduler: String,
+      readback: String
+  )
+
+  final case class DeltaNetStructuralPolicy(
+      duplicateAgent: EntityId,
+      eraseAgent: EntityId,
+      unrestrictedDiscard: String,
+      affineDiscard: String,
+      linearDiscard: String
+  )
+
+  final case class DeltaNetLowering(
+      entity: EntityId,
+      instruction: String,
+      operation: EntityId,
+      agent: EntityId,
+      preserves: Set[String],
+      evidence: String
+  )
+
+  enum DeltaNetAction:
+    case Duplicate
+    case Erase
+    case Drop
+    case Enqueue
+    case DequeueOrBlock
+    case SplitContext
+    case TransferResult
+
+  final case class DeltaNetInteraction(
+      entity: EntityId,
+      left: EntityId,
+      right: EntityId,
+      mode: Option[Mode],
+      action: DeltaNetAction
+  )
+
+  /**
+   * F7 defines DeltaNet lowering, structural agents, local active-pair
+   * interactions, scheduling, and readback policy as Trellis graph data.
+   *
+   * Scala only interprets this small declarative vocabulary. The first F7
+   * reducer deliberately delegates machine-operation primitives to CESK-R
+   * after graph-defined lowering; structural replicator/eraser interactions
+   * are executed directly as local net interactions.
+   */
+  object DeltaNetRules:
+    private val PolicyEntity = EntityId("deltanet.policy.execution")
+    private val StructuralPolicyEntity = EntityId("deltanet.policy.structural")
+
+    def agentKinds(graph: Graph): Set[EntityId] =
+      graph.entities.toVector.flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "deltanet.agent-kind").map(_ => entity)
+      }.toSet
+
+    def policy(graph: Graph): Either[String, DeltaNetPolicy] =
+      graph.entity(PolicyEntity) match
+        case Some(node) if node.kind == "deltanet.policy" =>
+          for
+            requiredRaw <- node.attrs.get("required-preserve").toRight("DeltaNet policy lacks required-preserve")
+            required <- parseSet(requiredRaw, "DeltaNet required-preserve")
+            proofRequired <- parseBoolean(node.attrs.get("proof-required"), "DeltaNet proof-required")
+            maxInteractions <- parsePositiveInt(node.attrs.get("max-interactions"), "DeltaNet max-interactions")
+            scheduler <- node.attrs.get("scheduler").filter(_.nonEmpty).toRight("DeltaNet policy lacks scheduler")
+            readback <- node.attrs.get("readback").filter(_.nonEmpty).toRight("DeltaNet policy lacks readback")
+          yield DeltaNetPolicy(required, proofRequired, maxInteractions, scheduler, readback)
+        case Some(node) => Left(s"${PolicyEntity.value} is ${node.kind}, not deltanet.policy")
+        case None => Left(s"missing ${PolicyEntity.value}")
+
+    def structuralPolicy(graph: Graph): Either[String, DeltaNetStructuralPolicy] =
+      graph.entity(StructuralPolicyEntity) match
+        case Some(node) if node.kind == "deltanet.structural-policy" =>
+          for
+            duplicate <- node.attrs.get("duplicate-agent").filter(_.nonEmpty).toRight("DeltaNet structural policy lacks duplicate-agent")
+            erase <- node.attrs.get("erase-agent").filter(_.nonEmpty).toRight("DeltaNet structural policy lacks erase-agent")
+            unrestricted <- parseDiscard(node.attrs.get("unrestricted-discard"), "unrestricted-discard")
+            affine <- parseDiscard(node.attrs.get("affine-discard"), "affine-discard")
+            linear <- parseDiscard(node.attrs.get("linear-discard"), "linear-discard")
+          yield DeltaNetStructuralPolicy(EntityId(duplicate), EntityId(erase), unrestricted, affine, linear)
+        case Some(node) => Left(s"${StructuralPolicyEntity.value} is ${node.kind}, not deltanet.structural-policy")
+        case None => Left(s"missing ${StructuralPolicyEntity.value}")
+
+    def lowerings(graph: Graph): Vector[DeltaNetLowering] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "deltanet.lowering-rule")
+          .flatMap(node => decodeLowering(entity, node).toOption)
+      }
+
+    def interactions(graph: Graph): Vector[DeltaNetInteraction] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "deltanet.interaction-rule")
+          .flatMap(node => decodeInteraction(entity, node).toOption)
+      }
+
+    def loweringForInstruction(graph: Graph, instruction: String): Option[DeltaNetLowering] =
+      lowerings(graph).find(_.instruction == instruction)
+
+    def admittedLowering(graph: Graph, lowering: DeltaNetLowering): Either[String, Boolean] =
+      policy(graph).map { p =>
+        p.requiredPreserve.subsetOf(lowering.preserves) &&
+        (!p.proofRequired || lowering.evidence.nonEmpty)
+      }
+
+    def interaction(
+        graph: Graph,
+        left: EntityId,
+        right: EntityId,
+        mode: Option[Mode]
+    ): Option[DeltaNetAction] =
+      interactions(graph).find { rule =>
+        val pair =
+          (rule.left == left && rule.right == right) ||
+          (rule.left == right && rule.right == left)
+        pair && (rule.mode.isEmpty || rule.mode == mode)
+      }.map(_.action)
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val errors = Vector.newBuilder[String]
+      val knownInvariants = EqualityRules.invariantKeys(graph)
+      val knownAgents = agentKinds(graph)
+
+      if graph.entity(PolicyEntity).isDefined then
+        policy(graph) match
+          case Left(error) => errors += s"invalid DeltaNet policy: $error"
+          case Right(p) =>
+            val unknown = p.requiredPreserve -- knownInvariants
+            if unknown.nonEmpty then
+              errors += s"DeltaNet policy references unknown invariants: ${unknown.toVector.sorted.mkString(",")}"
+
+      if graph.entity(StructuralPolicyEntity).isDefined then
+        structuralPolicy(graph) match
+          case Left(error) => errors += s"invalid DeltaNet structural policy: $error"
+          case Right(p) =>
+            if !knownAgents.contains(p.duplicateAgent) then
+              errors += s"DeltaNet structural policy references unknown duplicate agent ${p.duplicateAgent.value}"
+            if !knownAgents.contains(p.eraseAgent) then
+              errors += s"DeltaNet structural policy references unknown erase agent ${p.eraseAgent.value}"
+
+      val decodedLowerings = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "deltanet.lowering-rule").toVector.map(node => entity -> decodeLowering(entity, node))
+      }
+      decodedLowerings.foreach {
+        case (entity, Left(error)) => errors += s"invalid DeltaNet lowering ${entity.value}: $error"
+        case (entity, Right(rule)) =>
+          if graph.entity(rule.operation).isEmpty then
+            errors += s"invalid DeltaNet lowering ${entity.value}: missing operation ${rule.operation.value}"
+          if !knownAgents.contains(rule.agent) then
+            errors += s"invalid DeltaNet lowering ${entity.value}: missing agent ${rule.agent.value}"
+          val unknown = rule.preserves -- knownInvariants
+          if unknown.nonEmpty then
+            errors += s"invalid DeltaNet lowering ${entity.value}: unknown preserved invariants ${unknown.toVector.sorted.mkString(",")}"
+          policy(graph) match
+            case Right(p) if !p.requiredPreserve.subsetOf(rule.preserves) =>
+              errors += s"invalid DeltaNet lowering ${entity.value}: does not preserve required invariants"
+            case Right(p) if p.proofRequired && rule.evidence.isEmpty =>
+              errors += s"invalid DeltaNet lowering ${entity.value}: preservation evidence required"
+            case _ => ()
+      }
+      decodedLowerings.collect { case (_, Right(rule)) => rule }
+        .groupBy(_.instruction).toVector.sortBy(_._1).foreach { case (instruction, rules) =>
+          if rules.size > 1 then errors += s"ambiguous DeltaNet lowerings for instruction $instruction"
+        }
+
+      val decodedInteractions = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "deltanet.interaction-rule").toVector.map(node => entity -> decodeInteraction(entity, node))
+      }
+      decodedInteractions.foreach {
+        case (entity, Left(error)) => errors += s"invalid DeltaNet interaction ${entity.value}: $error"
+        case (entity, Right(rule)) =>
+          if !knownAgents.contains(rule.left) then
+            errors += s"invalid DeltaNet interaction ${entity.value}: missing left agent ${rule.left.value}"
+          if !knownAgents.contains(rule.right) then
+            errors += s"invalid DeltaNet interaction ${entity.value}: missing right agent ${rule.right.value}"
+      }
+      decodedInteractions.collect { case (_, Right(rule)) => rule }
+        .groupBy(rule => (orderedPair(rule.left, rule.right), rule.mode))
+        .toVector.foreach { case ((pair, mode), rules) =>
+          if rules.size > 1 then
+            errors += s"ambiguous DeltaNet interaction for ${pair._1.value}/${pair._2.value}/${mode.map(Canon.encodeMode).getOrElse("any")}"
+        }
+
+      errors.result()
+
+    private def decodeLowering(entity: EntityId, node: Node): Either[String, DeltaNetLowering] =
+      for
+        instruction <- node.attrs.get("instruction").filter(_.nonEmpty).toRight(s"${entity.value} lacks instruction")
+        operation <- node.attrs.get("operation").filter(_.nonEmpty).toRight(s"${entity.value} lacks operation")
+        agent <- node.attrs.get("agent").filter(_.nonEmpty).toRight(s"${entity.value} lacks agent")
+        preserveRaw <- node.attrs.get("preserves").toRight(s"${entity.value} lacks preserves")
+        preserves <- parseSet(preserveRaw, s"${entity.value} preserves")
+        evidence = node.attrs.getOrElse("evidence", "")
+      yield DeltaNetLowering(entity, instruction, EntityId(operation), EntityId(agent), preserves, evidence)
+
+    private def decodeInteraction(entity: EntityId, node: Node): Either[String, DeltaNetInteraction] =
+      for
+        left <- node.attrs.get("left").filter(_.nonEmpty).toRight(s"${entity.value} lacks left agent")
+        right <- node.attrs.get("right").filter(_.nonEmpty).toRight(s"${entity.value} lacks right agent")
+        mode <- node.attrs.get("mode") match
+          case None => Right(None)
+          case Some(value) => decodeMode(value).map(Some(_))
+        action <- node.attrs.get("action") match
+          case Some("duplicate") => Right(DeltaNetAction.Duplicate)
+          case Some("erase") => Right(DeltaNetAction.Erase)
+          case Some("drop") => Right(DeltaNetAction.Drop)
+          case Some("enqueue") => Right(DeltaNetAction.Enqueue)
+          case Some("dequeue-or-block") => Right(DeltaNetAction.DequeueOrBlock)
+          case Some("split-context") => Right(DeltaNetAction.SplitContext)
+          case Some("transfer-result") => Right(DeltaNetAction.TransferResult)
+          case Some(other) => Left(s"${entity.value} has unknown action $other")
+          case None => Left(s"${entity.value} lacks action")
+      yield DeltaNetInteraction(entity, EntityId(left), EntityId(right), mode, action)
+
+    private def orderedPair(a: EntityId, b: EntityId): (EntityId, EntityId) =
+      if a.value <= b.value then (a, b) else (b, a)
+
+    private def decodeMode(value: String): Either[String, Mode] = value match
+      case "unrestricted" => Right(Mode.Unrestricted)
+      case "affine" => Right(Mode.Affine)
+      case "linear" => Right(Mode.Linear)
+      case other => Left(s"unknown DeltaNet structural mode $other")
+
+    private def parseSet(raw: String, label: String): Either[String, Set[String]] =
+      val values = raw.split(";", -1).toVector.filter(_.nonEmpty)
+      if values.isEmpty then Left(s"$label must contain at least one key")
+      else if values.distinct.size != values.size then Left(s"$label contains duplicate keys")
+      else Right(values.toSet)
+
+    private def parseBoolean(value: Option[String], label: String): Either[String, Boolean] = value match
+      case Some("true") => Right(true)
+      case Some("false") => Right(false)
+      case Some(other) => Left(s"$label must be true or false, found $other")
+      case None => Left(s"missing $label")
+
+    private def parsePositiveInt(value: Option[String], label: String): Either[String, Int] = value match
+      case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
+      case None => Left(s"missing $label")
+
+    private def parseDiscard(value: Option[String], label: String): Either[String, String] = value match
+      case Some("erase") => Right("erase")
+      case Some("drop") => Right("drop")
+      case Some("forbid") => Right("forbid")
+      case Some(other) => Left(s"$label must be erase, drop, or forbid, found $other")
+      case None => Left(s"missing $label")
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
     errors ++= ProcessRules.definitionErrors(graph)
     errors ++= MachineRules.definitionErrors(graph)
     errors ++= EqualityRules.definitionErrors(graph)
+    errors ++= DeltaNetRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)

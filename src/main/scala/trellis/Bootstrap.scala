@@ -15,6 +15,7 @@ import trellis.Delta.*
  *   F3 + F4.delta = F4
  *   F4 + F5.delta = F5
  *   F5 + F6.delta = F6
+ *   F6 + F7.delta = F7
  *
  * No successor graph snapshot is checked in.
  */
@@ -32,6 +33,8 @@ object Bootstrap:
   val F5Root = "3516c065b71cce1667a5075625deea2ee88f0e58365ccc21d215e86127b3aab1"
   val F6ChangeId = "1200106d29fc3cb9ce27647803db8339b3ca66cfdca83abf95756833713ebc20"
   val F6Root = "478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1"
+  val F7ChangeId = "b1e91c7e639bd57a1e968927a901e3f694749d1f4d67cf16a5c19c57be72bff9"
+  val F7Root = "efcbbe6b6f335ebfcf67a1894d51aef35869d54e94da77b26b4700c68660750b"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -261,6 +264,62 @@ object Bootstrap:
     EntityId("equality.law.congruence")
   )
 
+  val f7ComponentEntities: Set[EntityId] = Set(
+    EntityId("deltanet.net"),
+    EntityId("deltanet.agent"),
+    EntityId("deltanet.wire"),
+    EntityId("deltanet.principal-port"),
+    EntityId("deltanet.auxiliary-port"),
+    EntityId("deltanet.active-pair"),
+    EntityId("deltanet.interaction"),
+    EntityId("deltanet.lowering"),
+    EntityId("deltanet.readback"),
+    EntityId("deltanet.scheduler")
+  )
+
+  val f7AgentKindEntities: Set[EntityId] = Set(
+    EntityId("deltanet.agent-kind.value"),
+    EntityId("deltanet.agent-kind.replicator"),
+    EntityId("deltanet.agent-kind.eraser"),
+    EntityId("deltanet.agent-kind.channel"),
+    EntityId("deltanet.agent-kind.process"),
+    EntityId("deltanet.agent-kind.alloc"),
+    EntityId("deltanet.agent-kind.move"),
+    EntityId("deltanet.agent-kind.borrow.shared"),
+    EntityId("deltanet.agent-kind.borrow.mut"),
+    EntityId("deltanet.agent-kind.end.borrow"),
+    EntityId("deltanet.agent-kind.send"),
+    EntityId("deltanet.agent-kind.receive"),
+    EntityId("deltanet.agent-kind.spawn"),
+    EntityId("deltanet.agent-kind.terminate"),
+    EntityId("deltanet.agent-kind.join")
+  )
+
+  val f7LoweringEntities: Set[EntityId] = Set(
+    EntityId("deltanet.lower.alloc"),
+    EntityId("deltanet.lower.move"),
+    EntityId("deltanet.lower.borrow.shared"),
+    EntityId("deltanet.lower.borrow.mut"),
+    EntityId("deltanet.lower.end.borrow"),
+    EntityId("deltanet.lower.drop"),
+    EntityId("deltanet.lower.new.channel"),
+    EntityId("deltanet.lower.send"),
+    EntityId("deltanet.lower.receive"),
+    EntityId("deltanet.lower.spawn"),
+    EntityId("deltanet.lower.terminate"),
+    EntityId("deltanet.lower.join")
+  )
+
+  val f7InteractionEntities: Set[EntityId] = Set(
+    EntityId("deltanet.interaction.replicate.unrestricted"),
+    EntityId("deltanet.interaction.erase.unrestricted"),
+    EntityId("deltanet.interaction.erase.affine"),
+    EntityId("deltanet.interaction.send.channel"),
+    EntityId("deltanet.interaction.receive.channel"),
+    EntityId("deltanet.interaction.spawn.process"),
+    EntityId("deltanet.interaction.join.process")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -332,8 +391,19 @@ object Bootstrap:
   lazy val f6: Graph =
     deriveFoundation("F6", f5, f6Change, F6Root)
 
+  lazy val f7Change: Change =
+    val change = loadFoundationChange("F7", F7ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F6ChangeId)),
+      "F7.delta must depend exactly on F6.delta"
+    )
+    change
+
+  lazy val f7: Graph =
+    deriveFoundation("F7", f6, f7Change, F7Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f6
+  lazy val graph: Graph = f7
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")
