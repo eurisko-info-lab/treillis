@@ -279,5 +279,48 @@ object FoundationTest:
         Set("alloc", "move", "borrow-shared", "borrow-mut", "end-borrow", "drop",
           "new-channel", "send", "receive", "spawn", "terminate", "join")
       )
+    }),
+    Test("F8 delta is canonical data depending exactly on F7", () => {
+      val change = Bootstrap.f8Change
+      equal(Change.id(change).value, Bootstrap.F8ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F7ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F8 is derived only from F7 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f7, Bootstrap.f8Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f8)))
+      equal(Canon.graphId(derived).value, Bootstrap.F8Root)
+    }),
+    Test("F8 runtime components, policy, and reduction rules are Trellis graph data", () => {
+      val graph = Bootstrap.f8
+      check(Bootstrap.f8RuntimeComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f8ReductionEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f8RuntimeComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.runtime-component")))
+      Bootstrap.f8ReductionEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.reduction-rule")))
+      equal(graph.entity(EntityId("deltanet.policy.runtime")).map(_.kind), Some("deltanet.runtime-policy"))
+      equal(graph.entity(EntityId("deltanet.runtime-engine")).map(_.kind), Some("deltanet.runtime-schema"))
+      equal(Check.DeltaNetRuntimeRules.rules(graph).size, 12)
+    }),
+    Test("F8 runtime relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f8).isEmpty)
+      val roles = Bootstrap.f8.edges.values.map(_.role).toSet
+      check(Set("deltanet.runtime-component", "deltanet.runtime-policy", "deltanet.runtime-invariant",
+        "deltanet.runtime-agent", "deltanet.runtime-operation").subsetOf(roles))
+      equal(Bootstrap.f8.edges.size, 215)
+    }),
+    Test("F8 independent execution policy and complete reduction table come from graph data", () => {
+      val policy = Check.DeltaNetRuntimeRules.policy(Bootstrap.f8).fold(err => throw new AssertionError(err), identity)
+      equal(policy.requiredPreserve, Set("type", "resource", "effect", "protocol"))
+      check(policy.proofRequired)
+      equal(policy.maxReductions, 4096)
+      equal(policy.scheduler, "stable-agent-id")
+      equal(policy.readback, "ceskr-state")
+      equal(policy.executor, "independent")
+      check(!policy.delegate)
+      equal(policy.oracle, "ceskr")
+      equal(
+        Check.DeltaNetRuntimeRules.rules(Bootstrap.f8).map(_.agent).toSet,
+        Check.DeltaNetRules.lowerings(Bootstrap.f8).map(_.agent).toSet
+      )
     })
   )

@@ -16,6 +16,7 @@ import trellis.Delta.*
  *   F4 + F5.delta = F5
  *   F5 + F6.delta = F6
  *   F6 + F7.delta = F7
+ *   F7 + F8.delta = F8
  *
  * No successor graph snapshot is checked in.
  */
@@ -35,6 +36,8 @@ object Bootstrap:
   val F6Root = "478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1"
   val F7ChangeId = "b1e91c7e639bd57a1e968927a901e3f694749d1f4d67cf16a5c19c57be72bff9"
   val F7Root = "efcbbe6b6f335ebfcf67a1894d51aef35869d54e94da77b26b4700c68660750b"
+  val F8ChangeId = "357603f917a830c5ff785c1bbc78e961d2389e9b1bc80e9a2af7a861e7cc69a2"
+  val F8Root = "7a49a1579c84b4a2c1d6613de4d8d14a8eff180d55e85108f7a7ffc13d5136d1"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -320,6 +323,29 @@ object Bootstrap:
     EntityId("deltanet.interaction.join.process")
   )
 
+  val f8RuntimeComponentEntities: Set[EntityId] = Set(
+    EntityId("deltanet.runtime-state"),
+    EntityId("deltanet.reducer"),
+    EntityId("deltanet.readback-state"),
+    EntityId("deltanet.parity-contract"),
+    EntityId("deltanet.reduction")
+  )
+
+  val f8ReductionEntities: Set[EntityId] = Set(
+    EntityId("deltanet.reduce.alloc"),
+    EntityId("deltanet.reduce.move"),
+    EntityId("deltanet.reduce.borrow.shared"),
+    EntityId("deltanet.reduce.borrow.mut"),
+    EntityId("deltanet.reduce.end.borrow"),
+    EntityId("deltanet.reduce.drop"),
+    EntityId("deltanet.reduce.new.channel"),
+    EntityId("deltanet.reduce.send"),
+    EntityId("deltanet.reduce.receive"),
+    EntityId("deltanet.reduce.spawn"),
+    EntityId("deltanet.reduce.terminate"),
+    EntityId("deltanet.reduce.join")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -402,8 +428,19 @@ object Bootstrap:
   lazy val f7: Graph =
     deriveFoundation("F7", f6, f7Change, F7Root)
 
+  lazy val f8Change: Change =
+    val change = loadFoundationChange("F8", F8ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F7ChangeId)),
+      "F8.delta must depend exactly on F7.delta"
+    )
+    change
+
+  lazy val f8: Graph =
+    deriveFoundation("F8", f7, f8Change, F8Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f7
+  lazy val graph: Graph = f8
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")

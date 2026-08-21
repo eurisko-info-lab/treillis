@@ -848,6 +848,181 @@ object Check:
       case Some(other) => Left(s"$label must be erase, drop, or forbid, found $other")
       case None => Left(s"missing $label")
 
+  final case class DeltaNetRuntimePolicy(
+      requiredPreserve: Set[String],
+      proofRequired: Boolean,
+      maxReductions: Int,
+      scheduler: String,
+      readback: String,
+      executor: String,
+      delegate: Boolean,
+      oracle: String
+  )
+
+  enum DeltaNetPrimitive:
+    case AllocateOwned
+    case MoveOwner
+    case BeginSharedLoan
+    case BeginMutableLoan
+    case EndLoan
+    case DropOwned
+    case CreateChannel
+    case Send
+    case Receive
+    case Spawn
+    case Terminate
+    case Join
+
+  final case class DeltaNetReduction(
+      entity: EntityId,
+      agent: EntityId,
+      operation: EntityId,
+      primitive: DeltaNetPrimitive,
+      preserves: Set[String],
+      evidence: String
+  )
+
+  /**
+   * F8 makes DeltaNet independently executable. F7 still defines lowering and
+   * active-pair policy; F8 adds an agent-to-primitive reduction table and an
+   * explicit no-delegation runtime policy. CESK-R is retained only as a
+   * differential oracle.
+   */
+  object DeltaNetRuntimeRules:
+    private val PolicyEntity = EntityId("deltanet.policy.runtime")
+
+    def enabled(graph: Graph): Boolean = graph.entity(PolicyEntity).isDefined
+
+    def policy(graph: Graph): Either[String, DeltaNetRuntimePolicy] =
+      graph.entity(PolicyEntity) match
+        case Some(node) if node.kind == "deltanet.runtime-policy" =>
+          for
+            requiredRaw <- node.attrs.get("required-preserve").toRight("DeltaNet runtime policy lacks required-preserve")
+            required <- parseSet(requiredRaw, "DeltaNet runtime required-preserve")
+            proofRequired <- parseBoolean(node.attrs.get("proof-required"), "DeltaNet runtime proof-required")
+            maxReductions <- parsePositiveInt(node.attrs.get("max-reductions"), "DeltaNet runtime max-reductions")
+            scheduler <- node.attrs.get("scheduler").filter(_.nonEmpty).toRight("DeltaNet runtime policy lacks scheduler")
+            readback <- node.attrs.get("readback").filter(_.nonEmpty).toRight("DeltaNet runtime policy lacks readback")
+            executor <- node.attrs.get("executor").filter(_.nonEmpty).toRight("DeltaNet runtime policy lacks executor")
+            delegate <- parseBoolean(node.attrs.get("delegate"), "DeltaNet runtime delegate")
+            oracle <- node.attrs.get("oracle").filter(_.nonEmpty).toRight("DeltaNet runtime policy lacks oracle")
+          yield DeltaNetRuntimePolicy(required, proofRequired, maxReductions, scheduler, readback, executor, delegate, oracle)
+        case Some(node) => Left(s"${PolicyEntity.value} is ${node.kind}, not deltanet.runtime-policy")
+        case None => Left(s"missing ${PolicyEntity.value}")
+
+    def rules(graph: Graph): Vector[DeltaNetReduction] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "deltanet.reduction-rule")
+          .flatMap(node => decodeReduction(entity, node).toOption)
+      }
+
+    def ruleForAgent(graph: Graph, agent: EntityId): Option[DeltaNetReduction] =
+      rules(graph).find(_.agent == agent)
+
+    def admitted(graph: Graph, rule: DeltaNetReduction): Either[String, Boolean] =
+      policy(graph).map { p =>
+        p.requiredPreserve.subsetOf(rule.preserves) &&
+        (!p.proofRequired || rule.evidence.nonEmpty)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val errors = Vector.newBuilder[String]
+      val policyPresent = graph.entity(PolicyEntity).isDefined
+      val reductionNodes = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "deltanet.reduction-rule").toVector.map(node => entity -> decodeReduction(entity, node))
+      }
+
+      if reductionNodes.nonEmpty && !policyPresent then
+        errors += s"DeltaNet runtime reductions exist without ${PolicyEntity.value}"
+
+      val decodedPolicy = if policyPresent then Some(policy(graph)) else None
+      decodedPolicy.foreach {
+        case Left(error) => errors += s"invalid DeltaNet runtime policy: $error"
+        case Right(p) =>
+          val unknown = p.requiredPreserve -- EqualityRules.invariantKeys(graph)
+          if unknown.nonEmpty then errors += s"DeltaNet runtime policy references unknown invariants: ${unknown.toVector.sorted.mkString(",")}" 
+          if p.executor != "independent" then errors += s"DeltaNet runtime executor must be independent, found ${p.executor}"
+          if p.delegate then errors += "DeltaNet runtime delegation must be disabled in F8"
+      }
+
+      val knownAgents = DeltaNetRules.agentKinds(graph)
+      val loweringsByAgent = DeltaNetRules.lowerings(graph).groupBy(_.agent)
+      reductionNodes.foreach {
+        case (entity, Left(error)) => errors += s"invalid DeltaNet reduction ${entity.value}: $error"
+        case (entity, Right(rule)) =>
+          if !knownAgents.contains(rule.agent) then errors += s"invalid DeltaNet reduction ${entity.value}: missing agent ${rule.agent.value}"
+          if graph.entity(rule.operation).isEmpty then errors += s"invalid DeltaNet reduction ${entity.value}: missing operation ${rule.operation.value}"
+          val unknown = rule.preserves -- EqualityRules.invariantKeys(graph)
+          if unknown.nonEmpty then errors += s"invalid DeltaNet reduction ${entity.value}: unknown preserved invariants ${unknown.toVector.sorted.mkString(",")}" 
+          decodedPolicy.collect { case Right(p) => p }.foreach { p =>
+            if !p.requiredPreserve.subsetOf(rule.preserves) then errors += s"invalid DeltaNet reduction ${entity.value}: does not preserve required invariants"
+            if p.proofRequired && rule.evidence.isEmpty then errors += s"invalid DeltaNet reduction ${entity.value}: preservation evidence required"
+          }
+          loweringsByAgent.get(rule.agent) match
+            case Some(lowerings) if lowerings.size == 1 && lowerings.head.operation != rule.operation =>
+              errors += s"invalid DeltaNet reduction ${entity.value}: operation ${rule.operation.value} disagrees with lowering ${lowerings.head.operation.value}"
+            case Some(lowerings) if lowerings.size > 1 =>
+              errors += s"invalid DeltaNet reduction ${entity.value}: agent ${rule.agent.value} has ambiguous lowerings"
+            case None => errors += s"invalid DeltaNet reduction ${entity.value}: agent ${rule.agent.value} is not produced by a lowering"
+            case _ => ()
+      }
+
+      val goodRules = reductionNodes.collect { case (_, Right(rule)) => rule }
+      goodRules.groupBy(_.agent).foreach { case (agent, xs) =>
+        if xs.size > 1 then errors += s"ambiguous DeltaNet reduction for agent ${agent.value}"
+      }
+
+      if policyPresent then
+        val expected = DeltaNetRules.lowerings(graph).map(_.agent).toSet
+        val actual = goodRules.map(_.agent).toSet
+        val missing = expected -- actual
+        val extra = actual -- expected
+        if missing.nonEmpty then errors += s"DeltaNet runtime lacks reductions for ${missing.toVector.map(_.value).sorted.mkString(",")}" 
+        if extra.nonEmpty then errors += s"DeltaNet runtime has reductions for unlowered agents ${extra.toVector.map(_.value).sorted.mkString(",")}" 
+
+      errors.result()
+
+    private def decodeReduction(entity: EntityId, node: Node): Either[String, DeltaNetReduction] =
+      for
+        agent <- node.attrs.get("agent").filter(_.nonEmpty).toRight(s"${entity.value} lacks agent")
+        operation <- node.attrs.get("operation").filter(_.nonEmpty).toRight(s"${entity.value} lacks operation")
+        primitive <- node.attrs.get("primitive") match
+          case Some("allocate-owned") => Right(DeltaNetPrimitive.AllocateOwned)
+          case Some("move-owner") => Right(DeltaNetPrimitive.MoveOwner)
+          case Some("begin-shared-loan") => Right(DeltaNetPrimitive.BeginSharedLoan)
+          case Some("begin-mutable-loan") => Right(DeltaNetPrimitive.BeginMutableLoan)
+          case Some("end-loan") => Right(DeltaNetPrimitive.EndLoan)
+          case Some("drop-owned") => Right(DeltaNetPrimitive.DropOwned)
+          case Some("create-channel") => Right(DeltaNetPrimitive.CreateChannel)
+          case Some("send") => Right(DeltaNetPrimitive.Send)
+          case Some("receive") => Right(DeltaNetPrimitive.Receive)
+          case Some("spawn") => Right(DeltaNetPrimitive.Spawn)
+          case Some("terminate") => Right(DeltaNetPrimitive.Terminate)
+          case Some("join") => Right(DeltaNetPrimitive.Join)
+          case Some(other) => Left(s"${entity.value} has unknown primitive $other")
+          case None => Left(s"${entity.value} lacks primitive")
+        preserveRaw <- node.attrs.get("preserves").toRight(s"${entity.value} lacks preserves")
+        preserves <- parseSet(preserveRaw, s"${entity.value} preserves")
+        evidence = node.attrs.getOrElse("evidence", "")
+      yield DeltaNetReduction(entity, EntityId(agent), EntityId(operation), primitive, preserves, evidence)
+
+    private def parseSet(raw: String, label: String): Either[String, Set[String]] =
+      val values = raw.split(";", -1).toVector.filter(_.nonEmpty)
+      if values.isEmpty then Left(s"$label must contain at least one key")
+      else if values.distinct.size != values.size then Left(s"$label contains duplicate keys")
+      else Right(values.toSet)
+
+    private def parseBoolean(value: Option[String], label: String): Either[String, Boolean] = value match
+      case Some("true") => Right(true)
+      case Some("false") => Right(false)
+      case Some(other) => Left(s"$label must be true or false, found $other")
+      case None => Left(s"missing $label")
+
+    private def parsePositiveInt(value: Option[String], label: String): Either[String, Int] = value match
+      case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
+      case None => Left(s"missing $label")
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
@@ -855,6 +1030,7 @@ object Check:
     errors ++= MachineRules.definitionErrors(graph)
     errors ++= EqualityRules.definitionErrors(graph)
     errors ++= DeltaNetRules.definitionErrors(graph)
+    errors ++= DeltaNetRuntimeRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)

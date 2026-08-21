@@ -369,13 +369,12 @@ object Machine:
 
 
   /**
-   * F7 DeltaNet bootstrap.
+   * F7/F8 DeltaNet bootstrap.
    *
-   * Lowering and interaction selection are graph-defined. The first reducer
-   * intentionally reuses F4 CESK-R transition primitives after lowering so the
-   * bootstrap can establish lowering/readback parity before a later foundation
-   * replaces those primitives with a fully independent interaction reducer.
-   * Structural replicator/eraser interactions are already reduced directly.
+   * F7 defines lowering and local interaction selection. F8 adds graph-defined
+   * independent agent reduction. CESK-R delegation remains available only when
+   * explicitly running predecessor F7, so historical foundation tests remain
+   * executable while the current foundation no longer delegates reduction.
    */
   object DeltaNet:
     final case class Agent(
@@ -413,6 +412,11 @@ object Machine:
       yield Net(agents, agents.map(agent => s"lower ${agent.instructionKey} -> ${agent.kind.value}"))
 
     def reduce(net: Net, initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
+      if Check.DeltaNetRuntimeRules.enabled(graph) then reduceIndependent(net, initial, graph)
+      else reduceF7Oracle(net, initial, graph)
+
+    /** F7 compatibility path retained only so predecessor-foundation tests remain executable. */
+    private def reduceF7Oracle(net: Net, initial: State, graph: Graph): Either[String, State] =
       for
         policy <- Check.DeltaNetRules.policy(graph)
         _ <- expect(policy.scheduler == "stable-agent-id", s"unsupported DeltaNet scheduler ${policy.scheduler}")
@@ -422,6 +426,136 @@ object Machine:
         }
         _ <- expect(policy.readback == "ceskr-state", s"unsupported DeltaNet readback ${policy.readback}")
       yield reduced
+
+    /**
+     * F8 independent reducer. Agent-to-primitive selection comes only from F8
+     * graph data. This path never calls Machine.step or Machine.stepDirect;
+     * CESK-R is therefore an external parity oracle rather than an executor.
+     */
+    private def reduceIndependent(net: Net, initial: State, graph: Graph): Either[String, State] =
+      for
+        runtime <- Check.DeltaNetRuntimeRules.policy(graph)
+        _ <- expect(runtime.executor == "independent", s"unsupported DeltaNet runtime executor ${runtime.executor}")
+        _ <- expect(!runtime.delegate, "F8 DeltaNet runtime delegation is disabled")
+        _ <- expect(runtime.scheduler == "stable-agent-id", s"unsupported DeltaNet runtime scheduler ${runtime.scheduler}")
+        _ <- expect(runtime.readback == "ceskr-state", s"unsupported DeltaNet runtime readback ${runtime.readback}")
+        _ <- expect(net.agents.size <= runtime.maxReductions, s"DeltaNet reduction budget exceeded: ${net.agents.size} > ${runtime.maxReductions}")
+        reduced <- net.agents.sortBy(_.id).foldLeft[Either[String, State]](Right(initial)) { (acc, agent) =>
+          acc.flatMap(state => reduceAgent(state, agent, graph))
+        }
+      yield reduced
+
+    private def reduceAgent(s: State, agent: Agent, graph: Graph): Either[String, State] =
+      for
+        rule <- Check.DeltaNetRuntimeRules.ruleForAgent(graph, agent.kind).toRight(
+          s"no F8 DeltaNet reduction for ${agent.kind.value}"
+        )
+        admitted <- Check.DeltaNetRuntimeRules.admitted(graph, rule)
+        _ <- expect(admitted, s"F8 DeltaNet reduction ${rule.entity.value} is not admitted")
+        next <- executePrimitive(s, agent.instruction, rule.primitive, graph)
+      yield next
+
+    private def executePrimitive(
+        s: State,
+        instruction: Instr,
+        primitive: Check.DeltaNetPrimitive,
+        graph: Graph
+    ): Either[String, State] =
+      (primitive, instruction) match
+        case (Check.DeltaNetPrimitive.AllocateOwned, Instr.Alloc(name, mode)) =>
+          if s.resources.contains(name) then Left(s"resource $name already exists")
+          else Right(s.copy(
+            resources = s.resources.updated(name, Resource(name, mode, Owner.Process(s.process))),
+            trace = s.trace :+ s"alloc $name -> ${s.process}"
+          ))
+
+        case (Check.DeltaNetPrimitive.MoveOwner, Instr.Move(name, to)) =>
+          owned(s, name).flatMap { r =>
+            ensureNoLoans(r).map { _ =>
+              s.copy(
+                resources = s.resources.updated(name, r.copy(owner = Owner.Process(to))),
+                processes = ensureProcess(s.processes, to),
+                trace = s.trace :+ s"move $name -> $to"
+              )
+            }
+          }
+
+        case (Check.DeltaNetPrimitive.BeginSharedLoan, Instr.BorrowShared(name, loan)) =>
+          owned(s, name).flatMap { r =>
+            if r.mutableLoan.nonEmpty then Left(s"cannot shared-borrow $name during mutable loan")
+            else Right(s.copy(
+              resources = s.resources.updated(name, r.copy(sharedLoans = r.sharedLoans + loan)),
+              trace = s.trace :+ s"borrow-shared $name as $loan"
+            ))
+          }
+
+        case (Check.DeltaNetPrimitive.BeginMutableLoan, Instr.BorrowMut(name, loan)) =>
+          owned(s, name).flatMap { r =>
+            if r.mutableLoan.nonEmpty || r.sharedLoans.nonEmpty then Left(s"cannot mutably borrow $name while borrowed")
+            else Right(s.copy(
+              resources = s.resources.updated(name, r.copy(mutableLoan = Some(loan))),
+              trace = s.trace :+ s"borrow-mut $name as $loan"
+            ))
+          }
+
+        case (Check.DeltaNetPrimitive.EndLoan, Instr.EndBorrow(loan)) =>
+          s.resources.find { case (_, r) => r.mutableLoan.contains(loan) || r.sharedLoans.contains(loan) } match
+            case None => Left(s"unknown loan $loan")
+            case Some((name, r)) =>
+              val next = r.copy(sharedLoans = r.sharedLoans - loan, mutableLoan = r.mutableLoan.filterNot(_ == loan))
+              Right(s.copy(resources = s.resources.updated(name, next), trace = s.trace :+ s"end-borrow $loan"))
+
+        case (Check.DeltaNetPrimitive.DropOwned, Instr.Drop(name)) =>
+          owned(s, name).flatMap { r =>
+            ensureNoLoans(r).flatMap { _ =>
+              r.owner match
+                case Owner.Shared(_) => Left(s"cannot uniquely drop shared resource $name")
+                case _ if r.mode == Mode.Linear => Left(s"linear resource $name requires explicit protocol completion")
+                case _ => Right(s.copy(resources = s.resources - name, trace = s.trace :+ s"drop $name"))
+            }
+          }
+
+        case (Check.DeltaNetPrimitive.CreateChannel, Instr.NewChannel(name)) =>
+          for
+            disposition <- processDecision(graph, "process.new-channel", None)
+            _ <- expect(disposition == ProcessDisposition.CreateChannel, "F3 process.new-channel rule must create a channel")
+            _ <- expect(!s.channels.contains(name), s"channel $name already exists")
+            sendMode <- Check.ProcessRules.endpointMode(graph, EntityId("process.capability.send"))
+            recvMode <- Check.ProcessRules.endpointMode(graph, EntityId("process.capability.recv"))
+            handleNames = Set(s"$name.send", s"$name.recv")
+            _ <- expect(handleNames.forall(n => !s.resources.contains(n)), s"channel endpoint resource collision for $name")
+          yield s.copy(
+            channels = s.channels.updated(name, Queue.empty),
+            waiting = s.waiting.updated(name, Queue.empty),
+            resources = s.resources
+              .updated(s"$name.send", Resource(s"$name.send", sendMode, Owner.Process(s.process), "process.send"))
+              .updated(s"$name.recv", Resource(s"$name.recv", recvMode, Owner.Process(s.process), "process.recv")),
+            trace = s.trace :+ s"channel $name"
+          )
+
+        case (Check.DeltaNetPrimitive.Send, Instr.Send(channel, resource)) =>
+          for
+            r <- owned(s, resource)
+            _ <- ensureNoLoans(r)
+            _ <- s.channels.get(channel).toRight(s"unknown channel $channel")
+            disposition <- processDecision(graph, "process.send", Some(r.mode))
+            next <- send(s, channel, r, disposition)
+          yield next
+
+        case (Check.DeltaNetPrimitive.Receive, Instr.Recv(channel, into)) =>
+          for
+            disposition <- processDecision(graph, "process.receive", None)
+            _ <- expect(disposition == ProcessDisposition.TransferToProcess, "F3 process.receive rule must transfer to a process")
+            q <- s.channels.get(channel).toRight(s"unknown channel $channel")
+            next <- q.dequeueOption match
+              case Some((resource, rest)) => deliverQueued(s, channel, resource, rest, into)
+              case None => Right(blockReceiver(s, channel, into))
+          yield next
+
+        case (Check.DeltaNetPrimitive.Spawn, Instr.Spawn(child, captures)) => spawn(s, child, captures, graph)
+        case (Check.DeltaNetPrimitive.Terminate, Instr.Terminate(process, result)) => terminate(s, process, result, graph)
+        case (Check.DeltaNetPrimitive.Join, Instr.Join(child, into)) => join(s, child, into, graph)
+        case _ => Left(s"F8 primitive $primitive is incompatible with ${instructionKeyOf(instruction)}")
 
     def run(program: Vector[Instr], initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
       lower(program, graph).flatMap(net => reduce(net, initial, graph))

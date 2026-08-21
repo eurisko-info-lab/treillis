@@ -219,5 +219,70 @@ object MachineTest:
       ).fold(err => throw new AssertionError(err), identity)
       check(Machine.DeltaNet.lower(Vector(Instr.Alloc("x", Mode.Affine)), changed).isLeft)
       check(Machine.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isRight)
+    }),
+    Test("F8 runtime maps lowered agents to independent graph-defined primitives", () => {
+      import trellis.Core.EntityId
+      equal(
+        Check.DeltaNetRuntimeRules.ruleForAgent(Bootstrap.f8, EntityId("deltanet.agent-kind.alloc")).map(_.primitive),
+        Some(Check.DeltaNetPrimitive.AllocateOwned)
+      )
+      equal(
+        Check.DeltaNetRuntimeRules.ruleForAgent(Bootstrap.f8, EntityId("deltanet.agent-kind.send")).map(_.primitive),
+        Some(Check.DeltaNetPrimitive.Send)
+      )
+      equal(
+        Check.DeltaNetRuntimeRules.ruleForAgent(Bootstrap.f8, EntityId("deltanet.agent-kind.join")).map(_.primitive),
+        Some(Check.DeltaNetPrimitive.Join)
+      )
+    }),
+    Test("F8 independent DeltaNet reducer stays in parity with CESK-R across all primitive families", () => {
+      val program = Vector(
+        Instr.Alloc("temp", Mode.Affine),
+        Instr.BorrowShared("temp", "r"),
+        Instr.EndBorrow("r"),
+        Instr.Drop("temp"),
+        Instr.Alloc("mut", Mode.Affine),
+        Instr.BorrowMut("mut", "m"),
+        Instr.EndBorrow("m"),
+        Instr.Drop("mut"),
+        Instr.Alloc("moved", Mode.Affine),
+        Instr.Move("moved", "worker"),
+        Instr.Alloc("job", Mode.Affine),
+        Instr.NewChannel("jobs"),
+        Instr.Send("jobs", "job"),
+        Instr.Recv("jobs", "receiver"),
+        Instr.Alloc("owned", Mode.Affine),
+        Instr.Alloc("shared", Mode.Unrestricted),
+        Instr.Spawn("child", Vector("owned", "shared")),
+        Instr.Terminate("child", None),
+        Instr.Join("child", "main")
+      )
+      val net = right(Machine.DeltaNet.run(program, graph = Bootstrap.f8))
+      val ceskr = right(Machine.run(program, graph = Bootstrap.f8))
+      equal(net, ceskr)
+    }),
+    Test("F8 DeltaNet execution no longer depends on F4 machine dispatch", () => {
+      val entity = trellis.Core.EntityId("machine.rule.alloc")
+      val original = Bootstrap.f8.entity(entity).getOrElse(throw new AssertionError("missing F4 alloc rule in F8"))
+      val altered = original.copy(attrs = original.attrs.updated("action", "drop-owned"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f8,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "break CESK-R dispatch for F8 independence test")
+      ).fold(err => throw new AssertionError(err), identity)
+
+      check(Machine.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isLeft)
+      check(Machine.DeltaNet.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isRight)
+    }),
+    Test("changing F8 reduction data changes DeltaNet without changing CESK-R", () => {
+      val entity = trellis.Core.EntityId("deltanet.reduce.alloc")
+      val original = Bootstrap.f8.entity(entity).getOrElse(throw new AssertionError("missing F8 alloc reduction"))
+      val altered = original.copy(attrs = original.attrs.updated("primitive", "drop-owned"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f8,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "alter F8 reduction for test")
+      ).fold(err => throw new AssertionError(err), identity)
+
+      check(Machine.DeltaNet.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isLeft)
+      check(Machine.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isRight)
     })
   )

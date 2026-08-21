@@ -1,25 +1,23 @@
-# Bootstrap
+# Trellis bootstrap through F8
 
-The Scala bootstrap is intentionally small. It supplies canonical graph/change encoding, repository mechanics, generic validation, CESK-R transition primitives, semantic navigation, primitive projection rendering, bounded equality closure, and the first generic DeltaNet lowering/reduction substrate.
-
-The current foundation is F7 and is reconstructed at startup from the frozen staircase:
+The bootstrap is a derivation staircase. F0 is the only foundation constructed by the Scala host. Every successor exists only as a canonical DeltaTrellis change.
 
 ```text
-F0 + F1.delta -> F1
-F1 + F2.delta -> F2
-F2 + F3.delta -> F3
-F3 + F4.delta -> F4
-F4 + F5.delta -> F5
-F5 + F6.delta -> F6
-F6 + F7.delta -> F7
+F0 -> F1 -> F2 -> F3 -> F4 -> F5 -> F6 -> F7 -> F8
 ```
 
-No F1-F7 graph snapshot is supplied.
+F8 is the first foundation where current DeltaNet execution no longer delegates machine steps to CESK-R. F7 still defines lowering and local interaction policy. F8 adds graph-defined runtime reduction rules and an explicit runtime policy:
 
-F7 moves DeltaNet vocabulary, agent kinds, machine-to-net lowering, local active-pair selection, structural replication/erasure policy, scheduling, invariant preservation, and readback policy into Trellis data.
+```text
+executor = independent
+delegate = false
+oracle   = ceskr
+```
 
-The F7 reducer is deliberately transitional. Graph-defined lowering is real, and replicator/eraser structural interactions reduce directly as local net interactions. Non-structural instruction agents currently delegate their primitive state transition to the F4 CESK-R executor after lowering. This provides a differential parity bridge rather than prematurely duplicating the full machine semantics in Scala.
+CESK-R remains executable as a differential oracle. Historical F7 execution retains its old delegation path so predecessor foundations stay testable.
 
-A later foundation can replace that delegated primitive executor with a fully independent interaction reducer without changing the F7 lowering contract.
+No `F8` graph snapshot is checked in. The only successor artifact is:
 
-Current bootstrap roots and delta IDs are printed by `sbt run` and can be queried individually with `hash-fN` and `delta-fN` commands.
+```text
+src/main/resources/trellis/foundations/F8.delta
+```
