@@ -25,6 +25,14 @@ object CanonTest:
     val id = Canon.nodeId(node)
     id -> Canon.record("n", Vector(id.value, Canon.encodeNode(node)))
 
+  private def fixture(name: String): Array[Byte] =
+    val path = s"/trellis/canon/adversarial/$name"
+    val stream = Option(getClass.getResourceAsStream(path)).getOrElse(
+      throw new IllegalStateException(s"missing shared canonical fixture $path")
+    )
+    try stream.readAllBytes()
+    finally stream.close()
+
   val tests = Vector(
     Test("canonical maps ignore insertion order", () => {
       val n1 = Node("x", attrs = Map("b" -> "2", "a" -> "1"))
@@ -85,6 +93,18 @@ object CanonTest:
       val badEdge = Edge(PortRef(sid, "missing"), PortRef(tid, "also-missing"))
       val g3 = Canon.addEdge(g2, badEdge)._1
       check(Canon.decodeGraph(Canon.encodeGraph(g3)).isLeft)
+    }),
+    Test("shared adversarial canonical fixtures are rejected", () => {
+      Vector(
+        "malformed-utf8.bin",
+        "nonminimal-atom.bin",
+        "trailing-data.bin",
+        "duplicate-node-key.bin",
+        "unordered-nodes.bin",
+        "missing-reference.bin"
+      ).foreach { name =>
+        check(Canon.decodeGraphBytes(fixture(name)).isLeft, s"fixture unexpectedly accepted: $name")
+      }
     }),
     Test("F0 self-describes its constitutional vocabulary", () => {
       check(Bootstrap.f0ConstitutionalEntities.subsetOf(Bootstrap.f0.entities.keySet))
