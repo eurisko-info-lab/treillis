@@ -358,5 +358,89 @@ object MachineTest:
       val net = right(Machine.DeltaNet.lower(program, changed))
       equal(right(Machine.DeltaNet.schedule(net, graph = changed)).size, 3)
       check(Machine.DeltaNet.run(program, graph = Bootstrap.f8).isRight)
+    }),
+    Test("F10 execution certificates are canonical and deterministic", () => {
+      val program = Vector(
+        Instr.Alloc("a", Mode.Affine),
+        Instr.Alloc("b", Mode.Unrestricted),
+        Instr.Alloc("x", Mode.Affine),
+        Instr.BorrowShared("x", "r"),
+        Instr.EndBorrow("r"),
+        Instr.Drop("x")
+      )
+      val first = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      val second = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      val encoded = Machine.DeltaNet.encodeCertificate(first)
+      equal(encoded, Machine.DeltaNet.encodeCertificate(second))
+      equal(Machine.DeltaNet.certificateId(first), Machine.DeltaNet.certificateId(second))
+      equal(Machine.DeltaNet.decodeCertificate(encoded), Right(first))
+      equal(
+        Machine.DeltaNet.decodeCertificateBytes(encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+        Right(first)
+      )
+      check(Machine.DeltaNet.decodeCertificate(encoded + "x").isLeft)
+    }),
+    Test("F10 certificates bind foundation, policy, net, and observable state roots", () => {
+      val program = Vector(Instr.Alloc("a", Mode.Affine), Instr.Alloc("b", Mode.Unrestricted))
+      val net = right(Machine.DeltaNet.lower(program, Bootstrap.f10))
+      val certificate = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      val end = right(Machine.DeltaNet.run(program, graph = Bootstrap.f10))
+      equal(certificate.foundationRoot, Bootstrap.F10Root)
+      equal(certificate.evidencePolicyContent, Bootstrap.f10.entities(trellis.Core.EntityId("deltanet.policy.evidence")).value)
+      equal(certificate.netRoot, Machine.DeltaNet.netRoot(net).value)
+      equal(certificate.initialRoot, Machine.DeltaNet.observableStateRoot(Machine.State()).value)
+      equal(certificate.finalRoot, Machine.DeltaNet.observableStateRoot(end).value)
+      equal(certificate.readbackRoot, certificate.finalRoot)
+    }),
+    Test("F10 round certificates reproduce F9 scheduling and dynamic footprints", () => {
+      val program = Vector(Instr.Alloc("a", Mode.Affine), Instr.Alloc("b", Mode.Affine), Instr.Alloc("c", Mode.Unrestricted))
+      val net = right(Machine.DeltaNet.lower(program, Bootstrap.f10))
+      val scheduled = right(Machine.DeltaNet.schedule(net, graph = Bootstrap.f10))
+      val certificate = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      equal(certificate.rounds.map(_.index), scheduled.map(_.index))
+      equal(certificate.rounds.map(_.redexes.map(_.agentId)), scheduled.map(_.agents.map(_.id)))
+      equal(certificate.rounds.head.redexes.flatMap(_.touches).toSet, Set("resource:a", "resource:b", "resource:c"))
+      check(certificate.rounds.forall(_.confluent))
+    }),
+    Test("F10 strict replay verifier accepts intact certificates", () => {
+      val program = Vector(
+        Instr.Alloc("x", Mode.Affine),
+        Instr.BorrowShared("x", "r"),
+        Instr.EndBorrow("r"),
+        Instr.Drop("x")
+      )
+      val certificate = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      val replayed = right(Machine.DeltaNet.verifyCertificate(program, certificate, graph = Bootstrap.f10))
+      val executed = right(Machine.DeltaNet.run(program, graph = Bootstrap.f10))
+      equal(Machine.DeltaNet.observableStateRoot(replayed), Machine.DeltaNet.observableStateRoot(executed))
+    }),
+    Test("F10 strict replay verifier rejects tampered certificates", () => {
+      val program = Vector(Instr.Alloc("x", Mode.Affine))
+      val certificate = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      val tampered = certificate.copy(finalRoot = "0".repeat(64))
+      check(Machine.DeltaNet.verifyCertificate(program, tampered, graph = Bootstrap.f10).isLeft)
+    }),
+    Test("F10 certificates reflect graph-defined scheduler policy while preserving readback", () => {
+      val entity = trellis.Core.EntityId("deltanet.policy.parallel")
+      val original = Bootstrap.f10.entity(entity).getOrElse(throw new AssertionError("missing F9 parallel policy in F10"))
+      val altered = original.copy(attrs = original.attrs.updated("scheduler", "singleton"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f10,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "serialize F10 evidence schedule for test")
+      ).fold(err => throw new AssertionError(err), identity)
+      val program = Vector(Instr.Alloc("a", Mode.Affine), Instr.Alloc("b", Mode.Affine), Instr.Alloc("c", Mode.Affine))
+      val parallel = right(Machine.DeltaNet.certify(program, graph = Bootstrap.f10))
+      val singleton = right(Machine.DeltaNet.certify(program, graph = changed))
+      equal(parallel.rounds.size, 1)
+      equal(singleton.rounds.size, 3)
+      equal(parallel.finalRoot, singleton.finalRoot)
+      check(Machine.DeltaNet.certificateId(parallel) != Machine.DeltaNet.certificateId(singleton))
+      check(Machine.DeltaNet.verifyCertificate(program, parallel, graph = changed).isLeft)
+    }),
+    Test("F10 observable state roots deliberately exclude diagnostic trace order", () => {
+      val program = Vector(Instr.Alloc("a", Mode.Affine), Instr.Alloc("b", Mode.Affine))
+      val clean = right(Machine.DeltaNet.certify(program, Machine.State(), Bootstrap.f10))
+      val noisy = right(Machine.DeltaNet.certify(program, Machine.State(trace = Vector("diagnostic-noise")), Bootstrap.f10))
+      equal(Machine.DeltaNet.encodeCertificate(clean), Machine.DeltaNet.encodeCertificate(noisy))
     })
   )

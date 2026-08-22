@@ -401,6 +401,33 @@ object Machine:
         trace: Vector[String]
     )
 
+
+    final case class RedexCertificate(
+        agentId: Int,
+        agentKind: EntityId,
+        instructionKey: String,
+        reduction: EntityId,
+        touches: Vector[String]
+    )
+
+    final case class RoundCertificate(
+        index: Int,
+        beforeRoot: String,
+        afterRoot: String,
+        redexes: Vector[RedexCertificate],
+        confluent: Boolean
+    )
+
+    final case class ExecutionCertificate(
+        foundationRoot: String,
+        evidencePolicyContent: String,
+        netRoot: String,
+        initialRoot: String,
+        finalRoot: String,
+        readbackRoot: String,
+        rounds: Vector[RoundCertificate]
+    )
+
     def lower(program: Vector[Instr], graph: Graph = Bootstrap.graph): Either[String, Net] =
       for
         policy <- Check.DeltaNetRules.policy(graph)
@@ -499,6 +526,287 @@ object Machine:
           yield current ++ resolved
         }
       yield keys
+
+    /** Canonical F10 content address of the lowered DeltaNet program. */
+    def netRoot(net: Net): ContentId =
+      ContentId(Canon.sha256(encodeNet(net)))
+
+    /** Canonical F10 content address of observable machine state; traces are not semantic state. */
+    def observableStateRoot(state: State): ContentId =
+      ContentId(Canon.sha256(encodeObservableState(state)))
+
+    def encodeCertificate(certificate: ExecutionCertificate): String =
+      val rounds = certificate.rounds.sortBy(_.index).map(encodeRoundCertificate)
+      Canon.record(
+        "execution-certificate",
+        Vector(
+          certificate.foundationRoot,
+          certificate.evidencePolicyContent,
+          certificate.netRoot,
+          certificate.initialRoot,
+          certificate.finalRoot,
+          certificate.readbackRoot,
+          Canon.record("rounds", rounds)
+        )
+      )
+
+    def certificateId(certificate: ExecutionCertificate): ContentId =
+      ContentId(Canon.sha256(encodeCertificate(certificate)))
+
+    def decodeCertificate(text: String): Either[String, ExecutionCertificate] =
+      for
+        parts <- Canon.fixed(text, "execution-certificate", 7)
+        _ <- validateCertificateHash(parts(0), "foundation root")
+        _ <- validateCertificateHash(parts(1), "evidence policy content id")
+        _ <- validateCertificateHash(parts(2), "net root")
+        _ <- validateCertificateHash(parts(3), "initial state root")
+        _ <- validateCertificateHash(parts(4), "final state root")
+        _ <- validateCertificateHash(parts(5), "readback root")
+        roundTexts <- Canon.fields(parts(6), "rounds")
+        rounds <- sequenceEither(roundTexts.map(decodeRoundCertificate))
+        _ <- expect(rounds.map(_.index) == rounds.indices.toVector, "F10 round indexes are not canonical")
+        certificate = ExecutionCertificate(parts(0), parts(1), parts(2), parts(3), parts(4), parts(5), rounds)
+        _ <- expect(encodeCertificate(certificate) == text, "non-canonical F10 execution certificate")
+      yield certificate
+
+    def decodeCertificateBytes(bytes: Array[Byte]): Either[String, ExecutionCertificate] =
+      for
+        text <- Canon.decodeUtf8(bytes)
+        certificate <- decodeCertificate(text)
+        _ <- expect(
+          java.util.Arrays.equals(encodeCertificate(certificate).getBytes(java.nio.charset.StandardCharsets.UTF_8), bytes),
+          "non-canonical F10 execution certificate bytes"
+        )
+      yield certificate
+
+    private def decodeRoundCertificate(text: String): Either[String, RoundCertificate] =
+      for
+        parts <- Canon.fixed(text, "round-certificate", 5)
+        index <- parts(0).toIntOption.filter(_ >= 0).toRight(s"invalid F10 round index ${parts(0)}")
+        _ <- validateCertificateHash(parts(1), "round before root")
+        _ <- validateCertificateHash(parts(2), "round after root")
+        redexTexts <- Canon.fields(parts(3), "redexes")
+        redexes <- sequenceEither(redexTexts.map(decodeRedexCertificate))
+        redexIds = redexes.map(_.agentId)
+        _ <- expect(redexIds == redexIds.sorted, "F10 redexes are not in canonical agent order")
+        _ <- expect(redexIds.distinct.size == redexIds.size, "F10 redex certificate contains duplicate agents")
+        confluent <- parts(4) match
+          case "true" => Right(true)
+          case "false" => Right(false)
+          case other => Left(s"invalid F10 confluence flag $other")
+      yield RoundCertificate(index, parts(1), parts(2), redexes, confluent)
+
+    private def decodeRedexCertificate(text: String): Either[String, RedexCertificate] =
+      for
+        parts <- Canon.fixed(text, "redex-certificate", 5)
+        agentId <- parts(0).toIntOption.filter(_ >= 0).toRight(s"invalid F10 agent id ${parts(0)}")
+        _ <- expect(parts(1).nonEmpty, "empty F10 agent kind")
+        _ <- expect(parts(2).nonEmpty, "empty F10 instruction key")
+        _ <- expect(parts(3).nonEmpty, "empty F10 reduction entity")
+        touches <- Canon.fields(parts(4), "touches")
+        _ <- expect(touches == touches.sorted, "F10 touch keys are not in canonical order")
+        _ <- expect(touches.distinct.size == touches.size, "F10 touch keys contain duplicates")
+      yield RedexCertificate(agentId, EntityId(parts(1)), parts(2), EntityId(parts(3)), touches)
+
+    private def validateCertificateHash(value: String, label: String): Either[String, Unit] =
+      Canon.validateHash(value, s"F10 $label")
+
+    private def sequenceEither[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
+      values.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) { (acc, value) =>
+        for
+          current <- acc
+          next <- value
+        yield current :+ next
+      }
+
+    /**
+     * F10 canonical execution evidence. Scheduling and reduction are replayed
+     * from F9/F8 graph data; the resulting certificate binds the full current
+     * foundation, evidence policy content, lowered net, dynamic footprints,
+     * and every observable before/after state root.
+     */
+    def certify(
+        program: Vector[Instr],
+        initial: State = State(),
+        graph: Graph = Bootstrap.graph
+    ): Either[String, ExecutionCertificate] =
+      for
+        policy <- Check.DeltaNetEvidenceRules.policy(graph)
+        _ <- expect(policy.encoding == "canonical-v1", s"unsupported F10 evidence encoding ${policy.encoding}")
+        _ <- expect(policy.hash == "sha256", s"unsupported F10 evidence hash ${policy.hash}")
+        _ <- expect(policy.stateRoot == "observable-state-v1", s"unsupported F10 state-root ${policy.stateRoot}")
+        _ <- expect(policy.roundOrder == "stable-index", s"unsupported F10 round order ${policy.roundOrder}")
+        _ <- expect(policy.agentOrder == "stable-agent-id", s"unsupported F10 agent order ${policy.agentOrder}")
+        _ <- expect(policy.verification == "replay-exact", s"unsupported F10 verification ${policy.verification}")
+        net <- lower(program, graph)
+        plan <- parallelPlan(net, initial, graph)
+        rounds = plan._1
+        finalState = plan._2
+        built <- buildRoundCertificates(rounds, initial, policy, graph)
+        roundCertificates = built._1
+        replayed = built._2
+        _ <- expect(observational(replayed) == observational(finalState), "F10 certificate replay diverged from F9 parallel execution")
+        policyContent <- Check.DeltaNetEvidenceRules.policyContentId(graph)
+        foundationRoot = Canon.graphId(graph).value
+        initialRoot = observableStateRoot(initial).value
+        finalRoot = observableStateRoot(finalState).value
+        certificate = ExecutionCertificate(
+          foundationRoot,
+          policyContent.value,
+          netRoot(net).value,
+          initialRoot,
+          finalRoot,
+          finalRoot,
+          roundCertificates
+        )
+      yield certificate
+
+    /** Strict replay verifier for an F10 certificate and its supplied program. */
+    def verifyCertificate(
+        program: Vector[Instr],
+        certificate: ExecutionCertificate,
+        initial: State = State(),
+        graph: Graph = Bootstrap.graph
+    ): Either[String, State] =
+      for
+        expected <- certify(program, initial, graph)
+        _ <- expect(
+          encodeCertificate(expected) == encodeCertificate(certificate),
+          s"F10 execution certificate mismatch: expected ${certificateId(expected).value}, found ${certificateId(certificate).value}"
+        )
+        net <- lower(program, graph)
+        result <- parallelPlan(net, initial, graph).map(_._2)
+      yield result
+
+    private def buildRoundCertificates(
+        rounds: Vector[Round],
+        initial: State,
+        policy: Check.DeltaNetEvidencePolicy,
+        graph: Graph
+    ): Either[String, (Vector[RoundCertificate], State)] =
+      rounds.foldLeft[Either[String, (Vector[RoundCertificate], State)]](Right(Vector.empty -> initial)) {
+        case (acc, round) =>
+          for
+            pair <- acc
+            certificates = pair._1
+            state = pair._2
+            _ <- expect(round.index == certificates.size, s"F10 round index ${round.index} is not canonical")
+            confluent <- roundConfluent(state, round, graph)
+            _ <- expect(!policy.requireConfluence || confluent, s"F10 round ${round.index} lacks required confluence evidence")
+            redexes <- round.agents.sortBy(_.id).foldLeft[Either[String, Vector[RedexCertificate]]](Right(Vector.empty)) {
+              (redexAcc, agent) =>
+                for
+                  current <- redexAcc
+                  rule <- Check.DeltaNetRuntimeRules.ruleForAgent(graph, agent.kind).toRight(
+                    s"no F8 DeltaNet reduction for ${agent.kind.value}"
+                  )
+                  touches <- footprint(agent, state, graph).map(_.toVector.sorted)
+                  _ <- expect(!policy.requireFootprints || touches.nonEmpty, s"F10 redex ${agent.id} lacks required footprint evidence")
+                yield current :+ RedexCertificate(agent.id, agent.kind, agent.instructionKey, rule.entity, touches)
+            }
+            before = observableStateRoot(state).value
+            next <- reduceRound(state, round.agents.sortBy(_.id), graph)
+            after = observableStateRoot(next).value
+            certificate = RoundCertificate(round.index, before, after, redexes, confluent)
+          yield (certificates :+ certificate) -> next
+      }
+
+    private def encodeRoundCertificate(round: RoundCertificate): String =
+      Canon.record(
+        "round-certificate",
+        Vector(
+          round.index.toString,
+          round.beforeRoot,
+          round.afterRoot,
+          Canon.record("redexes", round.redexes.sortBy(_.agentId).map(encodeRedexCertificate)),
+          round.confluent.toString
+        )
+      )
+
+    private def encodeRedexCertificate(redex: RedexCertificate): String =
+      Canon.record(
+        "redex-certificate",
+        Vector(
+          redex.agentId.toString,
+          redex.agentKind.value,
+          redex.instructionKey,
+          redex.reduction.value,
+          Canon.record("touches", redex.touches.sorted)
+        )
+      )
+
+    private def encodeNet(net: Net): String =
+      Canon.record(
+        "deltanet",
+        net.agents.sortBy(_.id).map { agent =>
+          Canon.record(
+            "agent",
+            Vector(agent.id.toString, agent.kind.value, agent.instructionKey, encodeInstruction(agent.instruction))
+          )
+        }
+      )
+
+    private def encodeInstruction(instruction: Instr): String = instruction match
+      case Instr.Alloc(name, mode) => Canon.record("alloc", Vector(name, Canon.encodeMode(mode)))
+      case Instr.Move(name, to) => Canon.record("move", Vector(name, to))
+      case Instr.BorrowShared(name, loan) => Canon.record("borrow-shared", Vector(name, loan))
+      case Instr.BorrowMut(name, loan) => Canon.record("borrow-mut", Vector(name, loan))
+      case Instr.EndBorrow(loan) => Canon.record("end-borrow", Vector(loan))
+      case Instr.Drop(name) => Canon.record("drop", Vector(name))
+      case Instr.NewChannel(name) => Canon.record("new-channel", Vector(name))
+      case Instr.Send(channel, resource) => Canon.record("send", Vector(channel, resource))
+      case Instr.Recv(channel, into) => Canon.record("receive", Vector(channel, into))
+      case Instr.Spawn(child, captures) => Canon.record("spawn", Vector(child, Canon.record("captures", captures)))
+      case Instr.Terminate(process, result) => Canon.record("terminate", Vector(process, encodeStringOption(result)))
+      case Instr.Join(child, into) => Canon.record("join", Vector(child, into))
+
+    private def encodeObservableState(state: State): String =
+      val processes = state.processes.toVector.sortBy(_._1).map { case (name, status) =>
+        Canon.record("process", Vector(name, encodeProcessStatus(status)))
+      }
+      val resources = state.resources.toVector.sortBy(_._1).map { case (_, resource) =>
+        Canon.record(
+          "resource",
+          Vector(
+            resource.name,
+            Canon.encodeMode(resource.mode),
+            encodeOwner(resource.owner),
+            resource.kind,
+            Canon.record("shared-loans", resource.sharedLoans.toVector.sorted),
+            encodeStringOption(resource.mutableLoan)
+          )
+        )
+      }
+      val channels = state.channels.toVector.sortBy(_._1).map { case (name, queue) =>
+        Canon.record("channel", Vector(name, Canon.record("queue", queue.iterator.toVector)))
+      }
+      val waiting = state.waiting.toVector.sortBy(_._1).map { case (name, queue) =>
+        Canon.record("waiting", Vector(name, Canon.record("queue", queue.iterator.toVector)))
+      }
+      Canon.record(
+        "observable-state",
+        Vector(
+          state.process,
+          Canon.record("processes", processes),
+          Canon.record("resources", resources),
+          Canon.record("channels", channels),
+          Canon.record("waiting", waiting)
+        )
+      )
+
+    private def encodeOwner(owner: Owner): String = owner match
+      case Owner.Process(name) => Canon.record("process", Vector(name))
+      case Owner.Channel(name) => Canon.record("channel", Vector(name))
+      case Owner.Shared(processes) => Canon.record("shared", processes.toVector.sorted)
+
+    private def encodeProcessStatus(status: ProcessStatus): String = status match
+      case ProcessStatus.Running => Canon.record("running", Vector.empty)
+      case ProcessStatus.Blocked(channel) => Canon.record("blocked", Vector(channel))
+      case ProcessStatus.Terminated(result) => Canon.record("terminated", Vector(encodeStringOption(result)))
+
+    private def encodeStringOption(value: Option[String]): String = value match
+      case None => Canon.record("none", Vector.empty)
+      case Some(text) => Canon.record("some", Vector(text))
 
     private def parallelPlan(net: Net, initial: State, graph: Graph): Either[String, (Vector[Round], State)] =
       for

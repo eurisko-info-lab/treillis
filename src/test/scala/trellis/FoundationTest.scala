@@ -364,5 +364,42 @@ object FoundationTest:
         Check.DeltaNetParallelRules.profiles(Bootstrap.f9).map(_.agent).toSet,
         Check.DeltaNetRuntimeRules.rules(Bootstrap.f9).map(_.agent).toSet
       )
+    }),
+    Test("F10 delta is canonical data depending exactly on F9", () => {
+      val change = Bootstrap.f10Change
+      equal(Change.id(change).value, Bootstrap.F10ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F9ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F10 is derived only from F9 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f9, Bootstrap.f10Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f10)))
+      equal(Canon.graphId(derived).value, Bootstrap.F10Root)
+    }),
+    Test("F10 execution evidence components and policy are Trellis graph data", () => {
+      val graph = Bootstrap.f10
+      check(Bootstrap.f10EvidenceComponentEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f10EvidenceComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.evidence-component")))
+      equal(graph.entity(EntityId("deltanet.policy.evidence")).map(_.kind), Some("deltanet.evidence-policy"))
+    }),
+    Test("F10 evidence relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f10).isEmpty)
+      val roles = Bootstrap.f10.edges.values.map(_.role).toSet
+      check(Set("evidence.net-root", "evidence.initial-root", "evidence.final-root", "evidence.readback-root",
+        "evidence.round", "evidence.redex", "evidence.footprint", "evidence.verify", "evidence.replay", "evidence.component").subsetOf(roles))
+      equal(Bootstrap.f10.edges.size, 263)
+    }),
+    Test("F10 canonical replay policy comes from graph data", () => {
+      val policy = Check.DeltaNetEvidenceRules.policy(Bootstrap.f10).fold(err => throw new AssertionError(err), identity)
+      equal(policy.encoding, "canonical-v1")
+      equal(policy.hash, "sha256")
+      equal(policy.stateRoot, "observable-state-v1")
+      equal(policy.roundOrder, "stable-index")
+      equal(policy.agentOrder, "stable-agent-id")
+      equal(policy.verification, "replay-exact")
+      check(policy.requireFootprints)
+      check(policy.requireConfluence)
+      check(policy.bindFoundationRoot)
+      check(policy.bindPolicyContent)
     })
   )

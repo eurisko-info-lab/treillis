@@ -18,6 +18,7 @@ import trellis.Delta.*
  *   F6 + F7.delta = F7
  *   F7 + F8.delta = F8
  *   F8 + F9.delta = F9
+ *   F9 + F10.delta = F10
  *
  * No successor graph snapshot is checked in.
  */
@@ -41,6 +42,8 @@ object Bootstrap:
   val F8Root = "7a49a1579c84b4a2c1d6613de4d8d14a8eff180d55e85108f7a7ffc13d5136d1"
   val F9ChangeId = "ccc41dcdba399dfa2c2fb016dff47e4762ccd72b619c4cf2f6e4e85b94dcd8ac"
   val F9Root = "f572b5243f38cfefd2eff2eb82c2cdd75173ee3fd900642451c50cf51c7dcce0"
+  val F10ChangeId = "3e0c7f3ecf831457b2dba30d6b4ed21702ef9363943d2b976b479ae365895ace"
+  val F10Root = "ecc80f1c146e1065f62f99811e897bc12c012b4a95e0b10ca02bbd5010fe69dc"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -374,6 +377,17 @@ object Bootstrap:
     EntityId("deltanet.parallel.join")
   )
 
+  val f10EvidenceComponentEntities: Set[EntityId] = Set(
+    EntityId("deltanet.execution-certificate"),
+    EntityId("deltanet.round-certificate"),
+    EntityId("deltanet.redex-certificate"),
+    EntityId("deltanet.net-root"),
+    EntityId("deltanet.state-root"),
+    EntityId("deltanet.readback-root"),
+    EntityId("deltanet.replay"),
+    EntityId("deltanet.verifier")
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -478,8 +492,19 @@ object Bootstrap:
   lazy val f9: Graph =
     deriveFoundation("F9", f8, f9Change, F9Root)
 
+  lazy val f10Change: Change =
+    val change = loadFoundationChange("F10", F10ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F9ChangeId)),
+      "F10.delta must depend exactly on F9.delta"
+    )
+    change
+
+  lazy val f10: Graph =
+    deriveFoundation("F10", f9, f10Change, F10Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f9
+  lazy val graph: Graph = f10
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")

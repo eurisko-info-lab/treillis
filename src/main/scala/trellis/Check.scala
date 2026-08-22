@@ -1190,6 +1190,116 @@ object Check:
       case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
       case None => Left(s"missing $label")
 
+  final case class DeltaNetEvidencePolicy(
+      encoding: String,
+      hash: String,
+      stateRoot: String,
+      roundOrder: String,
+      agentOrder: String,
+      verification: String,
+      requireFootprints: Boolean,
+      requireConfluence: Boolean,
+      bindFoundationRoot: Boolean,
+      bindPolicyContent: Boolean
+  )
+
+  /**
+   * F10 turns deterministic parallel execution into replayable canonical
+   * evidence. The certificate shape remains a runtime value, while its
+   * encoding, hashing, ordering, replay, and semantic-binding policy are
+   * constitutional Trellis graph data.
+   */
+  object DeltaNetEvidenceRules:
+    private val PolicyEntity = EntityId("deltanet.policy.evidence")
+    private val ComponentEntities = Set(
+      EntityId("deltanet.execution-certificate"),
+      EntityId("deltanet.round-certificate"),
+      EntityId("deltanet.redex-certificate"),
+      EntityId("deltanet.net-root"),
+      EntityId("deltanet.state-root"),
+      EntityId("deltanet.readback-root"),
+      EntityId("deltanet.replay"),
+      EntityId("deltanet.verifier")
+    )
+
+    def enabled(graph: Graph): Boolean = graph.entity(PolicyEntity).isDefined
+
+    def policy(graph: Graph): Either[String, DeltaNetEvidencePolicy] =
+      graph.entity(PolicyEntity) match
+        case Some(node) if node.kind == "deltanet.evidence-policy" =>
+          for
+            encoding <- required(node, "encoding")
+            hash <- required(node, "hash")
+            stateRoot <- required(node, "state-root")
+            roundOrder <- required(node, "round-order")
+            agentOrder <- required(node, "agent-order")
+            verification <- required(node, "verification")
+            requireFootprints <- parseBoolean(node.attrs.get("require-footprints"), "DeltaNet evidence require-footprints")
+            requireConfluence <- parseBoolean(node.attrs.get("require-confluence"), "DeltaNet evidence require-confluence")
+            bindFoundationRoot <- parseBoolean(node.attrs.get("bind-foundation-root"), "DeltaNet evidence bind-foundation-root")
+            bindPolicyContent <- parseBoolean(node.attrs.get("bind-policy-content"), "DeltaNet evidence bind-policy-content")
+          yield DeltaNetEvidencePolicy(
+            encoding,
+            hash,
+            stateRoot,
+            roundOrder,
+            agentOrder,
+            verification,
+            requireFootprints,
+            requireConfluence,
+            bindFoundationRoot,
+            bindPolicyContent
+          )
+        case Some(node) => Left(s"${PolicyEntity.value} is ${node.kind}, not deltanet.evidence-policy")
+        case None => Left(s"missing ${PolicyEntity.value}")
+
+    def policyContentId(graph: Graph): Either[String, ContentId] =
+      graph.entities.get(PolicyEntity).toRight(s"missing ${PolicyEntity.value}")
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val errors = Vector.newBuilder[String]
+      val policyPresent = graph.entity(PolicyEntity).isDefined
+      val evidenceComponentsPresent = ComponentEntities.exists(entity => graph.entity(entity).isDefined)
+
+      if evidenceComponentsPresent && !policyPresent then
+        errors += s"DeltaNet evidence components exist without ${PolicyEntity.value}"
+
+      if policyPresent then
+        policy(graph) match
+          case Left(error) => errors += s"invalid DeltaNet evidence policy: $error"
+          case Right(p) =>
+            if p.encoding != "canonical-v1" then errors += s"DeltaNet evidence encoding must be canonical-v1, found ${p.encoding}"
+            if p.hash != "sha256" then errors += s"DeltaNet evidence hash must be sha256, found ${p.hash}"
+            if p.stateRoot != "observable-state-v1" then errors += s"DeltaNet evidence state-root must be observable-state-v1, found ${p.stateRoot}"
+            if p.roundOrder != "stable-index" then errors += s"DeltaNet evidence round-order must be stable-index, found ${p.roundOrder}"
+            if p.agentOrder != "stable-agent-id" then errors += s"DeltaNet evidence agent-order must be stable-agent-id, found ${p.agentOrder}"
+            if p.verification != "replay-exact" then errors += s"DeltaNet evidence verification must be replay-exact, found ${p.verification}"
+            if !p.requireFootprints then errors += "DeltaNet evidence must require footprints"
+            if !p.requireConfluence then errors += "DeltaNet evidence must require confluence"
+            if !p.bindFoundationRoot then errors += "DeltaNet evidence must bind the foundation root"
+            if !p.bindPolicyContent then errors += "DeltaNet evidence must bind the policy content id"
+
+        ComponentEntities.toVector.sortBy(_.value).foreach { entity =>
+          graph.entity(entity) match
+            case Some(node) if node.kind == "deltanet.evidence-component" => ()
+            case Some(node) => errors += s"DeltaNet evidence component ${entity.value} has kind ${node.kind}"
+            case None => errors += s"DeltaNet evidence policy lacks component ${entity.value}"
+        }
+
+        if !DeltaNetParallelRules.enabled(graph) then errors += "DeltaNet evidence requires F9 parallel scheduling"
+        if !DeltaNetRuntimeRules.enabled(graph) then errors += "DeltaNet evidence requires F8 independent reduction"
+
+      errors.result()
+
+    private def required(node: Node, key: String): Either[String, String] =
+      node.attrs.get(key).filter(_.nonEmpty).toRight(s"DeltaNet evidence policy lacks $key")
+
+    private def parseBoolean(value: Option[String], label: String): Either[String, Boolean] = value match
+      case Some("true") => Right(true)
+      case Some("false") => Right(false)
+      case Some(other) => Left(s"$label must be true or false, found $other")
+      case None => Left(s"missing $label")
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
@@ -1199,6 +1309,7 @@ object Check:
     errors ++= DeltaNetRules.definitionErrors(graph)
     errors ++= DeltaNetRuntimeRules.definitionErrors(graph)
     errors ++= DeltaNetParallelRules.definitionErrors(graph)
+    errors ++= DeltaNetEvidenceRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)
