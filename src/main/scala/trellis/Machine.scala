@@ -389,6 +389,12 @@ object Machine:
         trace: Vector[String] = Vector.empty
     )
 
+    final case class Round(
+        index: Int,
+        agents: Vector[Agent],
+        touches: Set[String]
+    )
+
     final case class StructuralResult(
         outputs: Vector[String],
         interactions: Int,
@@ -412,7 +418,8 @@ object Machine:
       yield Net(agents, agents.map(agent => s"lower ${agent.instructionKey} -> ${agent.kind.value}"))
 
     def reduce(net: Net, initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
-      if Check.DeltaNetRuntimeRules.enabled(graph) then reduceIndependent(net, initial, graph)
+      if Check.DeltaNetParallelRules.enabled(graph) then reduceParallel(net, initial, graph)
+      else if Check.DeltaNetRuntimeRules.enabled(graph) then reduceIndependent(net, initial, graph)
       else reduceF7Oracle(net, initial, graph)
 
     /** F7 compatibility path retained only so predecessor-foundation tests remain executable. */
@@ -444,6 +451,203 @@ object Machine:
           acc.flatMap(state => reduceAgent(state, agent, graph))
         }
       yield reduced
+
+
+    /**
+     * F9 deterministic parallel reducer. A round is a maximal stable-id-ordered
+     * subset whose graph-defined dynamic touch footprints are pairwise disjoint.
+     * Independent agents are executed in stable order for deterministic trace
+     * production, while reverse-order replay is used as a local confluence
+     * check on observable state.
+     */
+    private def reduceParallel(net: Net, initial: State, graph: Graph): Either[String, State] =
+      parallelPlan(net, initial, graph).map(_._2)
+
+    def schedule(
+        net: Net,
+        initial: State = State(),
+        graph: Graph = Bootstrap.graph
+    ): Either[String, Vector[Round]] =
+      parallelPlan(net, initial, graph).map(_._1)
+
+    def roundConfluent(
+        initial: State,
+        round: Round,
+        graph: Graph = Bootstrap.graph
+    ): Either[String, Boolean] =
+      for
+        stable <- reduceRound(initial, round.agents.sortBy(_.id), graph)
+        reverse <- reduceRound(initial, round.agents.sortBy(_.id).reverse, graph)
+      yield observational(stable) == observational(reverse)
+
+    def footprint(
+        agent: Agent,
+        state: State = State(),
+        graph: Graph = Bootstrap.graph
+    ): Either[String, Set[String]] =
+      for
+        profile <- Check.DeltaNetParallelRules.profileForAgent(graph, agent.kind).toRight(
+          s"no F9 DeltaNet parallel profile for ${agent.kind.value}"
+        )
+        admitted <- Check.DeltaNetParallelRules.admitted(graph, profile)
+        _ <- expect(admitted, s"F9 DeltaNet parallel profile ${profile.entity.value} is not admitted")
+        fields = instructionFields(agent.instruction)
+        keys <- profile.touches.foldLeft[Either[String, Set[String]]](Right(Set.empty)) { (acc, selector) =>
+          for
+            current <- acc
+            resolved <- resolveTouch(selector, fields, state)
+          yield current ++ resolved
+        }
+      yield keys
+
+    private def parallelPlan(net: Net, initial: State, graph: Graph): Either[String, (Vector[Round], State)] =
+      for
+        policy <- Check.DeltaNetParallelRules.policy(graph)
+        runtime <- Check.DeltaNetRuntimeRules.policy(graph)
+        _ <- expect(runtime.executor == "independent" && !runtime.delegate, "F9 parallel execution requires the independent F8 runtime")
+        _ <- expect(policy.tieBreak == "stable-agent-id", s"unsupported F9 tie-break ${policy.tieBreak}")
+        _ <- expect(policy.conflict == "touch-overlap", s"unsupported F9 conflict relation ${policy.conflict}")
+        _ <- expect(policy.independence == "disjoint-touch", s"unsupported F9 independence relation ${policy.independence}")
+        _ <- expect(policy.confluence == "readback-equality", s"unsupported F9 confluence relation ${policy.confluence}")
+        result <- loopParallel(net.agents.sortBy(_.id), initial, Vector.empty, policy, graph)
+      yield result
+
+    private def loopParallel(
+        remaining: Vector[Agent],
+        state: State,
+        rounds: Vector[Round],
+        policy: Check.DeltaNetParallelPolicy,
+        graph: Graph
+    ): Either[String, (Vector[Round], State)] =
+      if remaining.isEmpty then Right(rounds -> state)
+      else if rounds.size >= policy.maxRounds then Left(s"F9 DeltaNet parallel round budget exceeded: ${rounds.size} >= ${policy.maxRounds}")
+      else
+        for
+          chosen <- chooseRound(remaining, state, policy, graph)
+          _ <- expect(chosen.nonEmpty, "F9 DeltaNet scheduler selected an empty round")
+          touchSets <- chosen.foldLeft[Either[String, Set[String]]](Right(Set.empty)) { (acc, agent) =>
+            for
+              current <- acc
+              next <- footprint(agent, state, graph)
+            yield current ++ next
+          }
+          round = Round(rounds.size, chosen, touchSets)
+          confluent <- roundConfluent(state, round, graph)
+          _ <- expect(confluent, s"F9 DeltaNet round ${round.index} is not confluent under readback equality")
+          next <- reduceRound(state, chosen.sortBy(_.id), graph)
+          chosenIds = chosen.map(_.id).toSet
+          rest = remaining.filterNot(agent => chosenIds.contains(agent.id))
+          result <- loopParallel(rest, next, rounds :+ round, policy, graph)
+        yield result
+
+    private def chooseRound(
+        remaining: Vector[Agent],
+        state: State,
+        policy: Check.DeltaNetParallelPolicy,
+        graph: Graph
+    ): Either[String, Vector[Agent]] =
+      policy.scheduler match
+        case "singleton" =>
+          remaining.sortBy(_.id).find(agent => reduceAgent(state, agent, graph).isRight) match
+            case Some(agent) => Right(Vector(agent))
+            case None => Left("F9 DeltaNet has no currently reducible agent")
+        case "maximal-nonconflicting" =>
+          remaining.sortBy(_.id).foldLeft[Either[String, (Vector[Agent], Set[String])]](Right(Vector.empty -> Set.empty)) {
+            case (acc, agent) =>
+              acc.flatMap { pair =>
+                val (selected, used) = pair
+                if reduceAgent(state, agent, graph).isLeft then Right(pair)
+                else
+                  footprint(agent, state, graph).map { keys =>
+                    if (keys intersect used).isEmpty then (selected :+ agent, used ++ keys)
+                    else pair
+                  }
+              }
+          }.map(_._1)
+        case other => Left(s"unsupported F9 DeltaNet parallel scheduler $other")
+
+    private def reduceRound(state: State, agents: Vector[Agent], graph: Graph): Either[String, State] =
+      agents.foldLeft[Either[String, State]](Right(state)) { (acc, agent) =>
+        acc.flatMap(current => reduceAgent(current, agent, graph))
+      }
+
+    private def observational(state: State): State = state.copy(trace = Vector.empty)
+
+    private def instructionFields(instruction: Instr): Map[String, Vector[String]] = instruction match
+      case Instr.Alloc(name, _) => Map("name" -> Vector(name))
+      case Instr.Move(name, to) => Map("name" -> Vector(name), "to" -> Vector(to))
+      case Instr.BorrowShared(name, loan) => Map("name" -> Vector(name), "loan" -> Vector(loan))
+      case Instr.BorrowMut(name, loan) => Map("name" -> Vector(name), "loan" -> Vector(loan))
+      case Instr.EndBorrow(loan) => Map("loan" -> Vector(loan))
+      case Instr.Drop(name) => Map("name" -> Vector(name))
+      case Instr.NewChannel(name) => Map("name" -> Vector(name))
+      case Instr.Send(channel, resource) => Map("channel" -> Vector(channel), "value" -> Vector(resource))
+      case Instr.Recv(channel, into) => Map("channel" -> Vector(channel), "to" -> Vector(into))
+      case Instr.Spawn(child, captures) => Map("child" -> Vector(child), "captures" -> captures)
+      case Instr.Terminate(process, result) => Map("pid" -> Vector(process), "result" -> result.toVector)
+      case Instr.Join(child, into) => Map("child" -> Vector(child), "to" -> Vector(into))
+
+    private def resolveTouch(
+        selector: String,
+        fields: Map[String, Vector[String]],
+        state: State
+    ): Either[String, Set[String]] =
+      val split = selector.indexOf(':')
+      if split <= 0 || split == selector.length - 1 then Left(s"invalid F9 touch selector $selector")
+      else
+        val category = selector.take(split)
+        val source = selector.drop(split + 1)
+        category match
+          case "loan-resource" =>
+            fieldValues(source, fields).map { loans =>
+              loans.flatMap { loan =>
+                state.resources.valuesIterator
+                  .filter(r => r.mutableLoan.contains(loan) || r.sharedLoans.contains(loan))
+                  .map(r => s"resource:${r.name}")
+                  .toVector
+              }.toSet
+            }
+          case "owned-by" =>
+            fieldValues(source, fields).map { processes =>
+              processes.flatMap { process =>
+                state.resources.valuesIterator.collect {
+                  case r if r.owner == Owner.Process(process) => s"resource:${r.name}"
+                  case r @ Resource(_, _, Owner.Shared(ps), _, _, _) if ps.contains(process) => s"resource:${r.name}"
+                }.toVector
+              }.toSet
+            }
+          case "result-of" =>
+            fieldValues(source, fields).map { processes =>
+              processes.flatMap { process =>
+                state.processes.get(process).toVector.flatMap {
+                  case ProcessStatus.Terminated(Some(name)) => Vector(s"resource:$name")
+                  case _ => Vector.empty
+                }
+              }.toSet
+            }
+          case "waiting-process" =>
+            fieldValues(source, fields).map { channels =>
+              channels.flatMap(channel => state.waiting.get(channel).flatMap(_.headOption).toVector.map(p => s"process:$p")).toSet
+            }
+          case "queued-resource" =>
+            fieldValues(source, fields).map { channels =>
+              channels.flatMap(channel => state.channels.get(channel).flatMap(_.headOption).toVector.map(r => s"resource:$r")).toSet
+            }
+          case other =>
+            fieldValues(source, fields).map(_.map(value => s"$other:$value").toSet)
+
+    private def fieldValues(source: String, fields: Map[String, Vector[String]]): Either[String, Vector[String]] =
+      if source.startsWith("=") then Right(Vector(source.drop(1)))
+      else
+        fields.get(source) match
+          case Some(values) => Right(values)
+          case None =>
+            val dot = source.indexOf('.')
+            if dot > 0 then
+              val base = source.take(dot)
+              val suffix = source.drop(dot)
+              fields.get(base).map(_.map(_ + suffix)).toRight(s"F9 touch selector references unknown field $base")
+            else Left(s"F9 touch selector references unknown field $source")
 
     private def reduceAgent(s: State, agent: Agent, graph: Graph): Either[String, State] =
       for

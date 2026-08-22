@@ -19,6 +19,7 @@ object Main:
       case Some("dump-f6") => println(Canon.encodeGraph(Bootstrap.f6))
       case Some("dump-f7") => println(Canon.encodeGraph(Bootstrap.f7))
       case Some("dump-f8") => println(Canon.encodeGraph(Bootstrap.f8))
+      case Some("dump-f9") => println(Canon.encodeGraph(Bootstrap.f9))
       case Some("delta-f1") => println(Delta.encodeChange(Bootstrap.f1Change))
       case Some("delta-f2") => println(Delta.encodeChange(Bootstrap.f2Change))
       case Some("delta-f3") => println(Delta.encodeChange(Bootstrap.f3Change))
@@ -27,6 +28,7 @@ object Main:
       case Some("delta-f6") => println(Delta.encodeChange(Bootstrap.f6Change))
       case Some("delta-f7") => println(Delta.encodeChange(Bootstrap.f7Change))
       case Some("delta-f8") => println(Delta.encodeChange(Bootstrap.f8Change))
+      case Some("delta-f9") => println(Delta.encodeChange(Bootstrap.f9Change))
       case Some("hash") => println(Canon.graphId(Bootstrap.graph).value)
       case Some("hash-f0") => println(Canon.graphId(Bootstrap.f0).value)
       case Some("hash-f1") => println(Canon.graphId(Bootstrap.f1).value)
@@ -37,6 +39,7 @@ object Main:
       case Some("hash-f6") => println(Canon.graphId(Bootstrap.f6).value)
       case Some("hash-f7") => println(Canon.graphId(Bootstrap.f7).value)
       case Some("hash-f8") => println(Canon.graphId(Bootstrap.f8).value)
+      case Some("hash-f9") => println(Canon.graphId(Bootstrap.f9).value)
       case Some("svg") => writeOrPrint(args.drop(1).headOption, Project.Svg.render(Bootstrap.graph).content)
       case Some("typst") => writeOrPrint(args.drop(1).headOption, Project.Typst.render(Bootstrap.graph).content)
       case Some("svg-ownership") => writeOrPrint(args.drop(1).headOption, Project.OwnershipSvg.render(Bootstrap.graph).content)
@@ -62,7 +65,9 @@ object Main:
     println(s"F7 delta:        ${Bootstrap.F7ChangeId}")
     println(s"F7 root:         ${Bootstrap.F7Root}")
     println(s"F8 delta:        ${Bootstrap.F8ChangeId}")
-    println(s"F8 root:         ${Canon.graphId(base).value}")
+    println(s"F8 root:         ${Bootstrap.F8Root}")
+    println(s"F9 delta:        ${Bootstrap.F9ChangeId}")
+    println(s"F9 root:         ${Canon.graphId(base).value}")
     println(s"nodes: ${base.nodes.size}, edges: ${base.edges.size}, entities: ${base.entities.size}")
     println(s"resource rules:  ${Check.ResourceRules.rules(base).size}")
     println(s"process rules:   ${Check.ProcessRules.rules(base).size}")
@@ -74,9 +79,10 @@ object Main:
     println(s"DeltaNet lowerings: ${Check.DeltaNetRules.lowerings(base).size}")
     println(s"DeltaNet interactions:${Check.DeltaNetRules.interactions(base).size}")
     println(s"DeltaNet reductions: ${Check.DeltaNetRuntimeRules.rules(base).size}")
+    println(s"DeltaNet parallel profiles: ${Check.DeltaNetParallelRules.profiles(base).size}")
 
     val publication = Publication(
-      PublicationId("foundation-f8-demo"),
+      PublicationId("foundation-f9-demo"),
       "trellis/application/default",
       "stable",
       Set.empty,

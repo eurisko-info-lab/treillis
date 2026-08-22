@@ -284,5 +284,79 @@ object MachineTest:
 
       check(Machine.DeltaNet.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isLeft)
       check(Machine.run(Vector(Instr.Alloc("x", Mode.Affine)), graph = changed).isRight)
+    }),
+    Test("F9 scheduler packs independent reductions into one deterministic parallel round", () => {
+      val net = right(Machine.DeltaNet.lower(Vector(
+        Instr.Alloc("a", Mode.Affine),
+        Instr.Alloc("b", Mode.Affine),
+        Instr.Alloc("c", Mode.Unrestricted)
+      ), Bootstrap.f9))
+      val rounds = right(Machine.DeltaNet.schedule(net, graph = Bootstrap.f9))
+      equal(rounds.size, 1)
+      equal(rounds.head.agents.map(_.id), Vector(0, 1, 2))
+      equal(rounds.head.touches, Set("resource:a", "resource:b", "resource:c"))
+    }),
+    Test("F9 conflicts and readiness preserve resource dependency chains", () => {
+      val program = Vector(
+        Instr.Alloc("x", Mode.Affine),
+        Instr.BorrowShared("x", "r"),
+        Instr.EndBorrow("r"),
+        Instr.Drop("x")
+      )
+      val net = right(Machine.DeltaNet.lower(program, Bootstrap.f9))
+      val rounds = right(Machine.DeltaNet.schedule(net, graph = Bootstrap.f9))
+      equal(rounds.map(_.agents.map(_.id)), Vector(Vector(0), Vector(1), Vector(2), Vector(3)))
+    }),
+    Test("F9 independent rounds commute under reverse local reduction order", () => {
+      val net = right(Machine.DeltaNet.lower(Vector(
+        Instr.Alloc("left", Mode.Affine),
+        Instr.Alloc("right", Mode.Unrestricted)
+      ), Bootstrap.f9))
+      val round = right(Machine.DeltaNet.schedule(net, graph = Bootstrap.f9)).head
+      check(right(Machine.DeltaNet.roundConfluent(Machine.State(), round, Bootstrap.f9)))
+    }),
+    Test("F9 parallel DeltaNet readback stays observationally equal to sequential F8", () => {
+      val program = Vector(
+        Instr.Alloc("a", Mode.Affine),
+        Instr.Alloc("b", Mode.Unrestricted),
+        Instr.Alloc("x", Mode.Affine),
+        Instr.BorrowShared("x", "r"),
+        Instr.EndBorrow("r"),
+        Instr.Drop("x")
+      )
+      val parallel = right(Machine.DeltaNet.run(program, graph = Bootstrap.f9))
+      val sequential = right(Machine.DeltaNet.run(program, graph = Bootstrap.f8))
+      equal(parallel.copy(trace = Vector.empty), sequential.copy(trace = Vector.empty))
+    }),
+    Test("changing F9 scheduler policy changes round structure without changing readback", () => {
+      val entity = trellis.Core.EntityId("deltanet.policy.parallel")
+      val original = Bootstrap.f9.entity(entity).getOrElse(throw new AssertionError("missing F9 parallel policy"))
+      val altered = original.copy(attrs = original.attrs.updated("scheduler", "singleton"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f9,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "serialize F9 scheduler for test")
+      ).fold(err => throw new AssertionError(err), identity)
+      val program = Vector(Instr.Alloc("a", Mode.Affine), Instr.Alloc("b", Mode.Affine), Instr.Alloc("c", Mode.Affine))
+      val net = right(Machine.DeltaNet.lower(program, changed))
+      val parallelRounds = right(Machine.DeltaNet.schedule(net, graph = Bootstrap.f9))
+      val singletonRounds = right(Machine.DeltaNet.schedule(net, graph = changed))
+      equal(parallelRounds.size, 1)
+      equal(singletonRounds.size, 3)
+      val a = right(Machine.DeltaNet.run(program, graph = Bootstrap.f9)).copy(trace = Vector.empty)
+      val b = right(Machine.DeltaNet.run(program, graph = changed)).copy(trace = Vector.empty)
+      equal(a, b)
+    }),
+    Test("changing F9 footprint data changes conflicts without changing F8 execution", () => {
+      val entity = trellis.Core.EntityId("deltanet.parallel.alloc")
+      val original = Bootstrap.f9.entity(entity).getOrElse(throw new AssertionError("missing F9 alloc parallel profile"))
+      val altered = original.copy(attrs = original.attrs.updated("touches", "resource:name;global:=alloc"))
+      val changed = trellis.Delta.applyChange(
+        Bootstrap.f9,
+        trellis.Delta.Change(Set.empty, Vector(trellis.Delta.Op.ReplaceEntity(entity, altered)), "serialize alloc footprints for test")
+      ).fold(err => throw new AssertionError(err), identity)
+      val program = Vector(Instr.Alloc("a", Mode.Affine), Instr.Alloc("b", Mode.Affine), Instr.Alloc("c", Mode.Affine))
+      val net = right(Machine.DeltaNet.lower(program, changed))
+      equal(right(Machine.DeltaNet.schedule(net, graph = changed)).size, 3)
+      check(Machine.DeltaNet.run(program, graph = Bootstrap.f8).isRight)
     })
   )

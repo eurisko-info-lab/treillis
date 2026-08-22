@@ -1,23 +1,26 @@
-# Trellis bootstrap through F8
+# Trellis bootstrap through F9
 
-The bootstrap is a derivation staircase. F0 is the only foundation constructed by the Scala host. Every successor exists only as a canonical DeltaTrellis change.
+The bootstrap remains a strict derivation staircase. F0 is the only foundation constructed directly by Scala; every successor is canonical DeltaTrellis data.
 
 ```text
-F0 -> F1 -> F2 -> F3 -> F4 -> F5 -> F6 -> F7 -> F8
+F0 -> F1 -> F2 -> F3 -> F4 -> F5 -> F6 -> F7 -> F8 -> F9
 ```
 
-F8 is the first foundation where current DeltaNet execution no longer delegates machine steps to CESK-R. F7 still defines lowering and local interaction policy. F8 adds graph-defined runtime reduction rules and an explicit runtime policy:
+F8 made DeltaNet independently executable. F9 moves the scheduler itself into the semantic graph: each runtime agent has a graph-defined dynamic touch profile, and a graph-defined policy selects deterministic maximal sets of pairwise non-conflicting reductions.
 
 ```text
-executor = independent
-delegate = false
-oracle   = ceskr
+scheduler    = maximal-nonconflicting
+tie-break    = stable-agent-id
+conflict     = touch-overlap
+independence = disjoint-touch
+confluence   = readback-equality
+oracle       = sequential-f8
 ```
 
-CESK-R remains executable as a differential oracle. Historical F7 execution retains its old delegation path so predecessor foundations stay testable.
+A parallel round is accepted only when every selected agent is currently reducible, its preservation profile is admitted, its dynamic footprint is disjoint from the other selected footprints, and stable/reverse local replay agrees on observable state.
 
-No `F8` graph snapshot is checked in. The only successor artifact is:
+There is no F9 graph snapshot. The successor artifact is only:
 
 ```text
-src/main/resources/trellis/foundations/F8.delta
+src/main/resources/trellis/foundations/F9.delta
 ```

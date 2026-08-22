@@ -1023,6 +1023,173 @@ object Check:
       case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
       case None => Left(s"missing $label")
 
+
+  final case class DeltaNetParallelPolicy(
+      requiredPreserve: Set[String],
+      proofRequired: Boolean,
+      maxRounds: Int,
+      scheduler: String,
+      tieBreak: String,
+      conflict: String,
+      independence: String,
+      oracle: String,
+      confluence: String
+  )
+
+  final case class DeltaNetParallelProfile(
+      entity: EntityId,
+      agent: EntityId,
+      operation: EntityId,
+      touches: Vector[String],
+      preserves: Set[String],
+      evidence: String
+  )
+
+  /**
+   * F9 makes deterministic parallelism semantic data. The host discovers a
+   * maximal non-conflicting round from dynamic touch keys, but the scheduler,
+   * conflict relation, preservation contract, oracle, and per-agent footprint
+   * selectors all live in the Trellis graph.
+   */
+  object DeltaNetParallelRules:
+    private val PolicyEntity = EntityId("deltanet.policy.parallel")
+
+    def enabled(graph: Graph): Boolean = graph.entity(PolicyEntity).isDefined
+
+    def policy(graph: Graph): Either[String, DeltaNetParallelPolicy] =
+      graph.entity(PolicyEntity) match
+        case Some(node) if node.kind == "deltanet.parallel-policy" =>
+          for
+            requiredRaw <- node.attrs.get("required-preserve").toRight("DeltaNet parallel policy lacks required-preserve")
+            required <- parseSet(requiredRaw, "DeltaNet parallel required-preserve")
+            proofRequired <- parseBoolean(node.attrs.get("proof-required"), "DeltaNet parallel proof-required")
+            maxRounds <- parsePositiveInt(node.attrs.get("max-rounds"), "DeltaNet parallel max-rounds")
+            scheduler <- node.attrs.get("scheduler").filter(_.nonEmpty).toRight("DeltaNet parallel policy lacks scheduler")
+            tieBreak <- node.attrs.get("tie-break").filter(_.nonEmpty).toRight("DeltaNet parallel policy lacks tie-break")
+            conflict <- node.attrs.get("conflict").filter(_.nonEmpty).toRight("DeltaNet parallel policy lacks conflict")
+            independence <- node.attrs.get("independence").filter(_.nonEmpty).toRight("DeltaNet parallel policy lacks independence")
+            oracle <- node.attrs.get("oracle").filter(_.nonEmpty).toRight("DeltaNet parallel policy lacks oracle")
+            confluence <- node.attrs.get("confluence").filter(_.nonEmpty).toRight("DeltaNet parallel policy lacks confluence")
+          yield DeltaNetParallelPolicy(required, proofRequired, maxRounds, scheduler, tieBreak, conflict, independence, oracle, confluence)
+        case Some(node) => Left(s"${PolicyEntity.value} is ${node.kind}, not deltanet.parallel-policy")
+        case None => Left(s"missing ${PolicyEntity.value}")
+
+    def profiles(graph: Graph): Vector[DeltaNetParallelProfile] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "deltanet.parallel-profile")
+          .flatMap(node => decodeProfile(entity, node).toOption)
+      }
+
+    def profileForAgent(graph: Graph, agent: EntityId): Option[DeltaNetParallelProfile] =
+      profiles(graph).find(_.agent == agent)
+
+    def admitted(graph: Graph, profile: DeltaNetParallelProfile): Either[String, Boolean] =
+      policy(graph).map { p =>
+        p.requiredPreserve.subsetOf(profile.preserves) &&
+        (!p.proofRequired || profile.evidence.nonEmpty)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val errors = Vector.newBuilder[String]
+      val policyPresent = graph.entity(PolicyEntity).isDefined
+      val profileNodes = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "deltanet.parallel-profile").toVector.map(node => entity -> decodeProfile(entity, node))
+      }
+
+      if profileNodes.nonEmpty && !policyPresent then
+        errors += s"DeltaNet parallel profiles exist without ${PolicyEntity.value}"
+
+      val decodedPolicy = if policyPresent then Some(policy(graph)) else None
+      decodedPolicy.foreach {
+        case Left(error) => errors += s"invalid DeltaNet parallel policy: $error"
+        case Right(p) =>
+          val unknown = p.requiredPreserve -- EqualityRules.invariantKeys(graph)
+          if unknown.nonEmpty then errors += s"DeltaNet parallel policy references unknown invariants: ${unknown.toVector.sorted.mkString(",")}" 
+          if !Set("maximal-nonconflicting", "singleton").contains(p.scheduler) then
+            errors += s"DeltaNet parallel scheduler must be maximal-nonconflicting or singleton, found ${p.scheduler}"
+          if p.tieBreak != "stable-agent-id" then errors += s"DeltaNet parallel tie-break must be stable-agent-id, found ${p.tieBreak}"
+          if p.conflict != "touch-overlap" then errors += s"DeltaNet parallel conflict must be touch-overlap, found ${p.conflict}"
+          if p.independence != "disjoint-touch" then errors += s"DeltaNet parallel independence must be disjoint-touch, found ${p.independence}"
+          if p.oracle != "sequential-f8" then errors += s"DeltaNet parallel oracle must be sequential-f8, found ${p.oracle}"
+          if p.confluence != "readback-equality" then errors += s"DeltaNet parallel confluence must be readback-equality, found ${p.confluence}"
+      }
+
+      val runtimeByAgent = DeltaNetRuntimeRules.rules(graph).groupBy(_.agent)
+      profileNodes.foreach {
+        case (entity, Left(error)) => errors += s"invalid DeltaNet parallel profile ${entity.value}: $error"
+        case (entity, Right(profile)) =>
+          if graph.entity(profile.agent).isEmpty then errors += s"invalid DeltaNet parallel profile ${entity.value}: missing agent ${profile.agent.value}"
+          if graph.entity(profile.operation).isEmpty then errors += s"invalid DeltaNet parallel profile ${entity.value}: missing operation ${profile.operation.value}"
+          val unknown = profile.preserves -- EqualityRules.invariantKeys(graph)
+          if unknown.nonEmpty then errors += s"invalid DeltaNet parallel profile ${entity.value}: unknown preserved invariants ${unknown.toVector.sorted.mkString(",")}" 
+          decodedPolicy.collect { case Right(p) => p }.foreach { p =>
+            if !p.requiredPreserve.subsetOf(profile.preserves) then errors += s"invalid DeltaNet parallel profile ${entity.value}: does not preserve required invariants"
+            if p.proofRequired && profile.evidence.isEmpty then errors += s"invalid DeltaNet parallel profile ${entity.value}: commutation evidence required"
+          }
+          runtimeByAgent.get(profile.agent) match
+            case Some(rules) if rules.size == 1 && rules.head.operation != profile.operation =>
+              errors += s"invalid DeltaNet parallel profile ${entity.value}: operation ${profile.operation.value} disagrees with runtime reduction ${rules.head.operation.value}"
+            case Some(rules) if rules.size > 1 =>
+              errors += s"invalid DeltaNet parallel profile ${entity.value}: agent ${profile.agent.value} has ambiguous runtime reductions"
+            case None => errors += s"invalid DeltaNet parallel profile ${entity.value}: agent ${profile.agent.value} has no F8 runtime reduction"
+            case _ => ()
+      }
+
+      val goodProfiles = profileNodes.collect { case (_, Right(profile)) => profile }
+      goodProfiles.groupBy(_.agent).foreach { case (agent, xs) =>
+        if xs.size > 1 then errors += s"ambiguous DeltaNet parallel profiles for agent ${agent.value}"
+      }
+
+      if policyPresent then
+        val expected = DeltaNetRuntimeRules.rules(graph).map(_.agent).toSet
+        val actual = goodProfiles.map(_.agent).toSet
+        val missing = expected -- actual
+        val extra = actual -- expected
+        if missing.nonEmpty then errors += s"DeltaNet parallel policy lacks profiles for ${missing.toVector.map(_.value).sorted.mkString(",")}" 
+        if extra.nonEmpty then errors += s"DeltaNet parallel policy profiles unknown runtime agents ${extra.toVector.map(_.value).sorted.mkString(",")}" 
+
+      errors.result()
+
+    private def decodeProfile(entity: EntityId, node: Node): Either[String, DeltaNetParallelProfile] =
+      for
+        agent <- node.attrs.get("agent").filter(_.nonEmpty).toRight(s"${entity.value} lacks agent")
+        operation <- node.attrs.get("operation").filter(_.nonEmpty).toRight(s"${entity.value} lacks operation")
+        touchesRaw <- node.attrs.get("touches").filter(_.nonEmpty).toRight(s"${entity.value} lacks touches")
+        touches <- parseTouches(touchesRaw, s"${entity.value} touches")
+        preserveRaw <- node.attrs.get("preserves").toRight(s"${entity.value} lacks preserves")
+        preserves <- parseSet(preserveRaw, s"${entity.value} preserves")
+        evidence = node.attrs.getOrElse("evidence", "")
+      yield DeltaNetParallelProfile(entity, EntityId(agent), EntityId(operation), touches, preserves, evidence)
+
+    private def parseTouches(raw: String, label: String): Either[String, Vector[String]] =
+      val values = raw.split(";", -1).toVector.filter(_.nonEmpty)
+      if values.isEmpty then Left(s"$label must contain at least one selector")
+      else if values.distinct.size != values.size then Left(s"$label contains duplicate selectors")
+      else
+        values.find { selector =>
+          val i = selector.indexOf(':')
+          i <= 0 || i == selector.length - 1
+        } match
+          case Some(bad) => Left(s"$label contains invalid selector $bad")
+          case None => Right(values)
+
+    private def parseSet(raw: String, label: String): Either[String, Set[String]] =
+      val values = raw.split(";", -1).toVector.filter(_.nonEmpty)
+      if values.isEmpty then Left(s"$label must contain at least one key")
+      else if values.distinct.size != values.size then Left(s"$label contains duplicate keys")
+      else Right(values.toSet)
+
+    private def parseBoolean(value: Option[String], label: String): Either[String, Boolean] = value match
+      case Some("true") => Right(true)
+      case Some("false") => Right(false)
+      case Some(other) => Left(s"$label must be true or false, found $other")
+      case None => Left(s"missing $label")
+
+    private def parsePositiveInt(value: Option[String], label: String): Either[String, Int] = value match
+      case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
+      case None => Left(s"missing $label")
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
@@ -1031,6 +1198,7 @@ object Check:
     errors ++= EqualityRules.definitionErrors(graph)
     errors ++= DeltaNetRules.definitionErrors(graph)
     errors ++= DeltaNetRuntimeRules.definitionErrors(graph)
+    errors ++= DeltaNetParallelRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)

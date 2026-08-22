@@ -12,29 +12,30 @@ F5  3516c065b71cce1667a5075625deea2ee88f0e58365ccc21d215e86127b3aab1
 F6  478974e6ac4c8767a64fecb00835b0505368c6140f1eac22f9cc618a3666bba1
 F7  efcbbe6b6f335ebfcf67a1894d51aef35869d54e94da77b26b4700c68660750b
 F8  7a49a1579c84b4a2c1d6613de4d8d14a8eff180d55e85108f7a7ffc13d5136d1
+F9  f572b5243f38cfefd2eff2eb82c2cdd75173ee3fd900642451c50cf51c7dcce0
 ```
 
-## Frozen F8 change
+## Frozen F9 change
 
 ```text
-357603f917a830c5ff785c1bbc78e961d2389e9b1bc80e9a2af7a861e7cc69a2
+ccc41dcdba399dfa2c2fb016dff47e4762ccd72b619c4cf2f6e4e85b94dcd8ac
 ```
 
-F8 depends exactly on F7.
+F9 depends exactly on F8.
 
-## F8 independent DeltaNet runtime
+## F9 deterministic parallel DeltaNet
 
-F8 adds five runtime components, an independent runtime policy, one runtime schema, and twelve agent reduction rules. Every reduction rule names:
+F9 adds seven parallel-runtime concepts, one parallel policy, and twelve per-agent parallel profiles. The profiles cover exactly the twelve independently executable F8 runtime agents.
 
-- the DeltaNet agent kind it consumes,
-- the semantic operation that agent represents,
-- the trusted local primitive to execute,
-- the preserved F6 invariants,
-- preservation evidence.
+Each profile names:
 
-The reduction table covers every agent produced by the twelve F7 lowerings.
+- the F8 DeltaNet agent kind,
+- its semantic operation,
+- dynamic touch selectors,
+- the F6 invariants it preserves,
+- commutation evidence.
 
-The runtime policy requires preservation of:
+The parallel policy requires preservation of:
 
 ```text
 type
@@ -46,15 +47,18 @@ protocol
 and freezes:
 
 ```text
-executor       independent
-delegate       false
-scheduler      stable-agent-id
-readback       ceskr-state
-oracle         ceskr
-max-reductions 4096
-proof-required true
+scheduler         maximal-nonconflicting
+tie-break         stable-agent-id
+conflict          touch-overlap
+independence      disjoint-touch
+confluence        readback-equality
+oracle            sequential-f8
+max-rounds        4096
+proof-required    true
 ```
 
-The host reducer may still share generic resource/process bookkeeping helpers with CESK-R, but F8 execution does not call `Machine.step` or `Machine.stepDirect`. Thus changing F4 dispatch can break CESK-R without changing F8 DeltaNet execution, while changing an F8 reduction rule can change DeltaNet without changing CESK-R.
+The host exposes only generic scheduling mechanics. It resolves graph-defined selectors against an instruction and current immutable runtime state, forms a maximal non-conflicting ready round, executes that round deterministically, and checks reverse-order local replay against readback equality.
 
-This differential independence is part of the F8 acceptance contract.
+Dynamic selectors can refer to direct instruction fields and semantic state derived from them. Examples include channel endpoints, the resource owning a loan, resources owned by a terminating process, the queued resource on a channel, and a terminated child's result.
+
+F9 therefore permits genuine local parallelism while preserving resource/process dependencies. Changing F9 scheduler or footprint data changes round formation without changing F8 sequential reduction rules.

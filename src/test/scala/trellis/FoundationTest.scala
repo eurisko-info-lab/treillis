@@ -322,5 +322,47 @@ object FoundationTest:
         Check.DeltaNetRuntimeRules.rules(Bootstrap.f8).map(_.agent).toSet,
         Check.DeltaNetRules.lowerings(Bootstrap.f8).map(_.agent).toSet
       )
+    }),
+    Test("F9 delta is canonical data depending exactly on F8", () => {
+      val change = Bootstrap.f9Change
+      equal(Change.id(change).value, Bootstrap.F9ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F8ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F9 is derived only from F8 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f8, Bootstrap.f9Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f9)))
+      equal(Canon.graphId(derived).value, Bootstrap.F9Root)
+    }),
+    Test("F9 parallel components, policy, and profiles are Trellis graph data", () => {
+      val graph = Bootstrap.f9
+      check(Bootstrap.f9ParallelComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f9ParallelProfileEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f9ParallelComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.parallel-component")))
+      Bootstrap.f9ParallelProfileEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("deltanet.parallel-profile")))
+      equal(graph.entity(EntityId("deltanet.policy.parallel")).map(_.kind), Some("deltanet.parallel-policy"))
+      equal(Check.DeltaNetParallelRules.profiles(graph).size, 12)
+    }),
+    Test("F9 parallel relationships are first-class typed graph edges", () => {
+      check(Check.validate(Bootstrap.f9).isEmpty)
+      val roles = Bootstrap.f9.edges.values.map(_.role).toSet
+      check(Set("deltanet.parallel.invariant", "deltanet.parallel.agent", "deltanet.parallel.operation").subsetOf(roles))
+      equal(Bootstrap.f9.edges.size, 243)
+    }),
+    Test("F9 deterministic parallel scheduling policy comes from graph data", () => {
+      val policy = Check.DeltaNetParallelRules.policy(Bootstrap.f9).fold(err => throw new AssertionError(err), identity)
+      equal(policy.requiredPreserve, Set("type", "resource", "effect", "protocol"))
+      check(policy.proofRequired)
+      equal(policy.maxRounds, 4096)
+      equal(policy.scheduler, "maximal-nonconflicting")
+      equal(policy.tieBreak, "stable-agent-id")
+      equal(policy.conflict, "touch-overlap")
+      equal(policy.independence, "disjoint-touch")
+      equal(policy.oracle, "sequential-f8")
+      equal(policy.confluence, "readback-equality")
+      equal(
+        Check.DeltaNetParallelRules.profiles(Bootstrap.f9).map(_.agent).toSet,
+        Check.DeltaNetRuntimeRules.rules(Bootstrap.f9).map(_.agent).toSet
+      )
     })
   )
