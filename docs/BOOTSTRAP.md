@@ -1,30 +1,23 @@
-# Trellis bootstrap through F10
+# Trellis bootstrap
 
-The bootstrap remains a strict derivation staircase. F0 is the only foundation constructed directly by Scala; every successor is canonical DeltaTrellis data.
+The host remains a deliberately small Scala 3.3.8 mechanics layer. The canonical program is the Trellis graph.
 
-```text
-F0 -> F1 -> F2 -> F3 -> F4 -> F5 -> F6 -> F7 -> F8 -> F9 -> F10
-```
-
-F8 made DeltaNet independently executable. F9 made deterministic parallel round formation graph-defined. F10 makes the resulting execution auditable: every deterministic parallel execution can emit canonical replay evidence binding the current foundation, evidence policy, lowered net, dynamic footprints, round boundaries, and observable state roots.
+The frozen staircase is now closed through F11:
 
 ```text
-encoding             = canonical-v1
-hash                 = sha256
-state-root           = observable-state-v1
-round-order          = stable-index
-agent-order          = stable-agent-id
-verification         = replay-exact
-require-footprints   = true
-require-confluence   = true
-bind-foundation-root = true
-bind-policy-content  = true
+F0
+ + F1.delta = F1
+ ...
+F9
+ + F10.delta = F10
+F10
+ + F11.delta = F11
 ```
 
-A certificate contains one redex certificate per selected agent and one round certificate per F9 parallel round. State roots deliberately exclude diagnostic trace order, matching F9 observational confluence. The matching strict decoder rejects non-canonical text/bytes. Verification then replays lowering, scheduling, footprints, confluence checks, and F8 independent reductions from the supplied program and current Trellis graph, requiring byte-identical canonical evidence.
+No successor graph snapshot is checked in.
 
-There is no F10 graph snapshot. The successor artifact is only:
+F11 is the closure declaration. It contains a graph-resident manifest for the ten predecessor-plus-delta derivations F0 -> F10. Each step binds its predecessor root, canonical delta id, exact dependency, successor root, resource name, and `snapshot=forbidden`.
 
-```text
-src/main/resources/trellis/foundations/F10.delta
-```
+`Bootstrap.cleanRoomReproduce` starts again at F0, strictly decodes each bundled delta, verifies its hash and dependency, applies it, validates the derived graph, and requires the exact frozen successor root. Any missing, malformed, reordered, skipped, or tampered step fails closed.
+
+The generated closure report is canonical and content-addressed. F11 itself is not listed inside its own manifest, which avoids a self-referential F11 root while preserving the ordinary `F10 + F11.delta = F11` derivation.

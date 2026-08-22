@@ -19,8 +19,11 @@ import trellis.Delta.*
  *   F7 + F8.delta = F8
  *   F8 + F9.delta = F9
  *   F9 + F10.delta = F10
+ *   F10 + F11.delta = F11
  *
- * No successor graph snapshot is checked in.
+ * No successor graph snapshot is checked in. F11 closes the bootstrap by
+ * carrying a graph-resident manifest that re-derives F0 -> F10 from F0 and
+ * the ten canonical predecessor deltas only.
  */
 object Bootstrap:
   val F0Root = "6503a6ecb482388edcea4258224e49547da4ece85233687b981d2086d40b13dd"
@@ -44,6 +47,8 @@ object Bootstrap:
   val F9Root = "f572b5243f38cfefd2eff2eb82c2cdd75173ee3fd900642451c50cf51c7dcce0"
   val F10ChangeId = "3e0c7f3ecf831457b2dba30d6b4ed21702ef9363943d2b976b479ae365895ace"
   val F10Root = "ecc80f1c146e1065f62f99811e897bc12c012b4a95e0b10ca02bbd5010fe69dc"
+  val F11ChangeId = "6aa7aabb086c5b6c02574b05495a2dcc67d6fb32cbaf5048ca728926a85e78c5"
+  val F11Root = "73782cc5c18c8deb5aa55861f04e87a3cdc9b54dfd114e00fe8aad793d5f4e55"
 
   private def meta(kind: String, description: String): Node =
     Node("meta.node-kind", attrs = Map("name" -> kind, "description" -> description))
@@ -388,6 +393,34 @@ object Bootstrap:
     EntityId("deltanet.verifier")
   )
 
+  val f11ClosureComponentEntities: Set[EntityId] = Set(
+    EntityId("bootstrap.component.manifest"),
+    EntityId("bootstrap.component.derivation-step"),
+    EntityId("bootstrap.component.foundation-root"),
+    EntityId("bootstrap.component.delta-id"),
+    EntityId("bootstrap.component.clean-room"),
+    EntityId("bootstrap.component.reproducer"),
+    EntityId("bootstrap.component.verifier"),
+    EntityId("bootstrap.component.report")
+  )
+
+  val f11DerivationStepEntities: Set[EntityId] =
+    (1 to 10).map(i => EntityId(s"bootstrap.step.F$i")).toSet
+
+  final case class ClosureStepReport(
+      foundation: String,
+      predecessorRoot: String,
+      deltaId: String,
+      successorRoot: String
+  )
+
+  final case class ClosureReport(
+      start: String,
+      end: String,
+      steps: Vector[ClosureStepReport],
+      finalRoot: String
+  )
+
   lazy val f0: Graph =
     val withNodes = f0NodeKinds.foldLeft(Graph()) { case (g, (entity, node)) =>
       val (g1, id) = Canon.addNode(g, node)
@@ -503,8 +536,75 @@ object Bootstrap:
   lazy val f10: Graph =
     deriveFoundation("F10", f9, f10Change, F10Root)
 
+  lazy val f11Change: Change =
+    val change = loadFoundationChange("F11", F11ChangeId)
+    require(
+      change.dependencies == Set(ChangeId(F10ChangeId)),
+      "F11.delta must depend exactly on F10.delta"
+    )
+    change
+
+  lazy val f11: Graph =
+    deriveFoundation("F11", f10, f11Change, F11Root)
+
   /** Current Trellis foundation used by demos and new local branches. */
-  lazy val graph: Graph = f10
+  lazy val graph: Graph = f11
+
+  /**
+   * Reproduce the frozen F0 -> F10 staircase from F0 plus bundled deltas only.
+   * F11 is the closure declaration and therefore is deliberately not part of
+   * the manifest it verifies, avoiding a self-referential root.
+   */
+  def cleanRoomReproduce(manifestGraph: Graph = f11): Either[String, ClosureReport] =
+    val definitionErrors = Check.BootstrapClosureRules.definitionErrors(manifestGraph)
+    if definitionErrors.nonEmpty then Left(definitionErrors.mkString("; "))
+    else
+      for
+        policy <- Check.BootstrapClosureRules.policy(manifestGraph)
+        ordered = Check.BootstrapClosureRules.steps(manifestGraph).sortBy(_.ordinal)
+        _ <- Either.cond(Canon.graphId(f0).value == ordered.head.predecessorRoot, (), "F0 root disagrees with closure manifest")
+        result <- ordered.foldLeft[Either[String, (Graph, Vector[ClosureStepReport])]](Right(f0 -> Vector.empty)) {
+          case (acc, step) =>
+            acc.flatMap { case (current, reports) =>
+              val currentRoot = Canon.graphId(current).value
+              if currentRoot != step.predecessorRoot then
+                Left(s"${step.foundation} predecessor root mismatch: $currentRoot != ${step.predecessorRoot}")
+              else
+                val bytes = readResource(step.resource)
+                Delta.decodeChangeBytes(bytes).flatMap { change =>
+                  val actualId = Change.id(change).value
+                  val expectedDependencies = step.dependency.map(ChangeId.apply).toSet
+                  if actualId != step.deltaId then
+                    Left(s"${step.foundation} delta id mismatch: $actualId != ${step.deltaId}")
+                  else if change.dependencies != expectedDependencies then
+                    Left(s"${step.foundation} dependency mismatch")
+                  else
+                    Delta.applyChange(current, change).flatMap { next =>
+                      val errors = Check.validate(next)
+                      val nextRoot = Canon.graphId(next).value
+                      if errors.nonEmpty then Left(s"${step.foundation} validation failed: ${errors.mkString("; ")}")
+                      else if nextRoot != step.successorRoot then
+                        Left(s"${step.foundation} successor root mismatch: $nextRoot != ${step.successorRoot}")
+                      else
+                        Right(next -> (reports :+ ClosureStepReport(step.foundation, currentRoot, actualId, nextRoot)))
+                    }
+                }
+            }
+        }
+        (finalGraph, reports) = result
+        finalRoot = Canon.graphId(finalGraph).value
+        _ <- Either.cond(reports.size == policy.stepCount, (), s"closure reproduced ${reports.size} steps, expected ${policy.stepCount}")
+        _ <- Either.cond(reports.lastOption.exists(_.foundation == policy.end), (), s"closure did not finish at ${policy.end}")
+      yield ClosureReport(policy.start, policy.end, reports, finalRoot)
+
+  def encodeClosureReport(report: ClosureReport): String =
+    val steps = report.steps.map { step =>
+      Canon.record("closure-step", Vector(step.foundation, step.predecessorRoot, step.deltaId, step.successorRoot))
+    }
+    Canon.record("closure-report", Vector(report.start, report.end, Canon.record("steps", steps), report.finalRoot))
+
+  def closureReportId(report: ClosureReport): ContentId =
+    ContentId(Canon.sha256(encodeClosureReport(report)))
 
   private def loadFoundationChange(name: String, expectedId: String): Change =
     val bytes = readResource(s"/trellis/foundations/$name.delta")

@@ -401,5 +401,61 @@ object FoundationTest:
       check(policy.requireConfluence)
       check(policy.bindFoundationRoot)
       check(policy.bindPolicyContent)
+    }),
+    Test("F11 delta is canonical data depending exactly on F10", () => {
+      val change = Bootstrap.f11Change
+      equal(Change.id(change).value, Bootstrap.F11ChangeId)
+      equal(change.dependencies, Set(ChangeId(Bootstrap.F10ChangeId)))
+      equal(Delta.decodeChange(Delta.encodeChange(change)), Right(change))
+    }),
+    Test("F11 is derived only from F10 plus its canonical delta", () => {
+      val derived = right(Delta.applyChange(Bootstrap.f10, Bootstrap.f11Change))
+      check(Arrays.equals(Canon.encodeGraphBytes(derived), Canon.encodeGraphBytes(Bootstrap.f11)))
+      equal(Canon.graphId(derived).value, Bootstrap.F11Root)
+    }),
+    Test("F11 closure manifest and derivation staircase are Trellis graph data", () => {
+      val graph = Bootstrap.f11
+      check(Bootstrap.f11ClosureComponentEntities.subsetOf(graph.entities.keySet))
+      check(Bootstrap.f11DerivationStepEntities.subsetOf(graph.entities.keySet))
+      Bootstrap.f11ClosureComponentEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("bootstrap.closure-component")))
+      Bootstrap.f11DerivationStepEntities.foreach(e => equal(graph.entity(e).map(_.kind), Some("bootstrap.derivation-step")))
+      equal(Check.BootstrapClosureRules.steps(graph).size, 10)
+      val roles = graph.edges.values.map(_.role).toSet
+      check(Set("bootstrap.component", "bootstrap.policy", "bootstrap.step", "bootstrap.manifest", "bootstrap.reproducer", "bootstrap.verifier").subsetOf(roles))
+      equal(graph.nodes.size, 267)
+      equal(graph.edges.size, 287)
+      equal(graph.entities.size, 267)
+      check(Check.validate(graph).isEmpty)
+    }),
+    Test("F11 clean-room verifier rederives F0 through F10 with no skip path", () => {
+      val report1 = Bootstrap.cleanRoomReproduce(Bootstrap.f11).fold(err => throw new AssertionError(err), identity)
+      val report2 = Bootstrap.cleanRoomReproduce(Bootstrap.f11).fold(err => throw new AssertionError(err), identity)
+      equal(report1.start, "F0")
+      equal(report1.end, "F10")
+      equal(report1.steps.size, 10)
+      equal(report1.finalRoot, Bootstrap.F10Root)
+      equal(Bootstrap.encodeClosureReport(report1), Bootstrap.encodeClosureReport(report2))
+      equal(Bootstrap.closureReportId(report1), Bootstrap.closureReportId(report2))
+      equal(report1.steps.map(_.foundation), (1 to 10).map(i => s"F$i").toVector)
+    }),
+    Test("F11 closure policy is fail-closed and forbids successor snapshots", () => {
+      val policy = Check.BootstrapClosureRules.policy(Bootstrap.f11).fold(err => throw new AssertionError(err), identity)
+      equal(policy.reproduction, "predecessor-plus-delta")
+      equal(policy.deltaDecoding, "strict-canonical")
+      equal(policy.dependency, "exact-predecessor-change")
+      equal(policy.validation, "full")
+      equal(policy.snapshot, "successor-forbidden")
+      equal(policy.failure, "fail-closed")
+      val steps = Check.BootstrapClosureRules.steps(Bootstrap.f11)
+      check(steps.forall(_.snapshot == "forbidden"))
+      check((1 to 11).forall(i => getClass.getResourceAsStream(s"/trellis/foundations/F$i.graph") == null))
+    }),
+    Test("F11 closure verification rejects a tampered derivation manifest", () => {
+      val target = EntityId("bootstrap.step.F5")
+      val original = Bootstrap.f11.entity(target).get
+      val tampered = original.copy(attrs = original.attrs.updated("successor-root", "0".repeat(64)))
+      val (withNode, id) = Canon.addNode(Bootstrap.f11, tampered)
+      val graph = withNode.copy(entities = withNode.entities.updated(target, id))
+      check(Check.BootstrapClosureRules.definitionErrors(graph).nonEmpty || Bootstrap.cleanRoomReproduce(graph).isLeft)
     })
   )

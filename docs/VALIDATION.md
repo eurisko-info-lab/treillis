@@ -7,38 +7,20 @@ sbt compile
 sbt "Test/compile"
 sbt "Test/runMain trellis.TestMain"
 sbt run
+sbt "run closure"
 ```
 
-Expected F10 identities:
+F11 acceptance requires:
 
-```text
-F10 delta 3e0c7f3ecf831457b2dba30d6b4ed21702ef9363943d2b976b479ae365895ace
-F10 root  ecc80f1c146e1065f62f99811e897bc12c012b4a95e0b10ca02bbd5010fe69dc
-```
-
-Expected current graph shape:
-
-```text
-nodes        244
-edges        263
-entities     244
-lowerings     12
-interactions   7
-reductions    12
-parallel profiles 12
-evidence components 8
-```
-
-Expected suite size after F10: **119 tests**.
-
-Critical F10 checks:
-
-1. F10 derives only from frozen F9 plus canonical `F10.delta`.
-2. Evidence concepts and replay policy are Trellis graph data connected by typed semantic edges.
-3. Repeated certification of the same program/state/graph is byte-identical and content-address identical; strict text/byte decoding round-trips exactly.
-4. Certificates bind the foundation root, evidence-policy content id, lowered-net root, and observable state roots.
-5. Round certificates reproduce F9 round selection, agent order, dynamic footprints, and confluence verdicts.
-6. Exact replay accepts intact certificates and rejects any tampering.
-7. Changing F9 scheduling policy changes the certificate and round structure while preserving final observational readback.
-8. A certificate created under one graph is rejected under changed semantics.
-9. Diagnostic trace ordering does not perturb observable state roots or certificate identity.
+- `F11.delta` strictly decodes and has the frozen change id,
+- its only dependency is `F10.delta`,
+- applying it to F10 produces the frozen F11 root,
+- all closure vocabulary and ten derivation steps are graph data,
+- the closure manifest has exactly the ordered F1..F10 staircase,
+- each step consumes the previous successor root and delta dependency,
+- all deltas are loaded from canonical `.delta` resources,
+- no `F1.graph` through `F11.graph` successor snapshot resource exists,
+- clean-room reproduction from F0 reaches exactly the frozen F10 root,
+- two independent clean-room reproductions produce byte-identical canonical reports,
+- tampering a manifest step is rejected,
+- validation has no skip or permissive fallback path.

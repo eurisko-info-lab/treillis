@@ -21,6 +21,7 @@ object Main:
       case Some("dump-f8") => println(Canon.encodeGraph(Bootstrap.f8))
       case Some("dump-f9") => println(Canon.encodeGraph(Bootstrap.f9))
       case Some("dump-f10") => println(Canon.encodeGraph(Bootstrap.f10))
+      case Some("dump-f11") => println(Canon.encodeGraph(Bootstrap.f11))
       case Some("delta-f1") => println(Delta.encodeChange(Bootstrap.f1Change))
       case Some("delta-f2") => println(Delta.encodeChange(Bootstrap.f2Change))
       case Some("delta-f3") => println(Delta.encodeChange(Bootstrap.f3Change))
@@ -31,6 +32,7 @@ object Main:
       case Some("delta-f8") => println(Delta.encodeChange(Bootstrap.f8Change))
       case Some("delta-f9") => println(Delta.encodeChange(Bootstrap.f9Change))
       case Some("delta-f10") => println(Delta.encodeChange(Bootstrap.f10Change))
+      case Some("delta-f11") => println(Delta.encodeChange(Bootstrap.f11Change))
       case Some("hash") => println(Canon.graphId(Bootstrap.graph).value)
       case Some("hash-f0") => println(Canon.graphId(Bootstrap.f0).value)
       case Some("hash-f1") => println(Canon.graphId(Bootstrap.f1).value)
@@ -43,6 +45,10 @@ object Main:
       case Some("hash-f8") => println(Canon.graphId(Bootstrap.f8).value)
       case Some("hash-f9") => println(Canon.graphId(Bootstrap.f9).value)
       case Some("hash-f10") => println(Canon.graphId(Bootstrap.f10).value)
+      case Some("hash-f11") => println(Canon.graphId(Bootstrap.f11).value)
+      case Some("closure") =>
+        val report = Bootstrap.cleanRoomReproduce().fold(err => throw new IllegalStateException(err), identity)
+        println(Bootstrap.encodeClosureReport(report))
       case Some("svg") => writeOrPrint(args.drop(1).headOption, Project.Svg.render(Bootstrap.graph).content)
       case Some("typst") => writeOrPrint(args.drop(1).headOption, Project.Typst.render(Bootstrap.graph).content)
       case Some("svg-ownership") => writeOrPrint(args.drop(1).headOption, Project.OwnershipSvg.render(Bootstrap.graph).content)
@@ -72,7 +78,9 @@ object Main:
     println(s"F9 delta:        ${Bootstrap.F9ChangeId}")
     println(s"F9 root:         ${Bootstrap.F9Root}")
     println(s"F10 delta:       ${Bootstrap.F10ChangeId}")
-    println(s"F10 root:        ${Canon.graphId(base).value}")
+    println(s"F10 root:        ${Bootstrap.F10Root}")
+    println(s"F11 delta:       ${Bootstrap.F11ChangeId}")
+    println(s"F11 root:        ${Canon.graphId(base).value}")
     println(s"nodes: ${base.nodes.size}, edges: ${base.edges.size}, entities: ${base.entities.size}")
     println(s"resource rules:  ${Check.ResourceRules.rules(base).size}")
     println(s"process rules:   ${Check.ProcessRules.rules(base).size}")
@@ -86,9 +94,12 @@ object Main:
     println(s"DeltaNet reductions: ${Check.DeltaNetRuntimeRules.rules(base).size}")
     println(s"DeltaNet parallel profiles: ${Check.DeltaNetParallelRules.profiles(base).size}")
     println(s"DeltaNet evidence components: ${Bootstrap.f10EvidenceComponentEntities.size}")
+    println(s"bootstrap closure steps: ${Check.BootstrapClosureRules.steps(base).size}")
+    val closure = Bootstrap.cleanRoomReproduce(base).fold(err => throw new IllegalStateException(err), identity)
+    println(s"clean-room closure: ${Bootstrap.closureReportId(closure).value.take(12)} -> ${closure.finalRoot.take(12)}")
 
     val publication = Publication(
-      PublicationId("foundation-f10-demo"),
+      PublicationId("foundation-f11-demo"),
       "trellis/application/default",
       "stable",
       Set.empty,

@@ -1300,6 +1300,188 @@ object Check:
       case Some(other) => Left(s"$label must be true or false, found $other")
       case None => Left(s"missing $label")
 
+  final case class BootstrapClosurePolicy(
+      start: String,
+      end: String,
+      stepCount: Int,
+      ordering: String,
+      reproduction: String,
+      deltaDecoding: String,
+      dependency: String,
+      validation: String,
+      snapshot: String,
+      failure: String,
+      report: String
+  )
+
+  final case class BootstrapDerivationStep(
+      entity: EntityId,
+      ordinal: Int,
+      foundation: String,
+      predecessor: String,
+      predecessorRoot: String,
+      deltaId: String,
+      dependency: Option[String],
+      successorRoot: String,
+      resource: String,
+      snapshot: String
+  )
+
+  /** F11 graph-resident description of the clean-room bootstrap closure. */
+  object BootstrapClosureRules:
+    private val PolicyEntity = EntityId("bootstrap.policy.closure")
+    private val ManifestEntity = EntityId("bootstrap.manifest")
+    private val ComponentEntities = Set(
+      EntityId("bootstrap.component.manifest"),
+      EntityId("bootstrap.component.derivation-step"),
+      EntityId("bootstrap.component.foundation-root"),
+      EntityId("bootstrap.component.delta-id"),
+      EntityId("bootstrap.component.clean-room"),
+      EntityId("bootstrap.component.reproducer"),
+      EntityId("bootstrap.component.verifier"),
+      EntityId("bootstrap.component.report")
+    )
+    private val HashPattern = "^[0-9a-f]{64}$".r
+
+    def enabled(graph: Graph): Boolean = graph.entity(PolicyEntity).isDefined
+
+    def policy(graph: Graph): Either[String, BootstrapClosurePolicy] =
+      graph.entity(PolicyEntity) match
+        case Some(node) if node.kind == "bootstrap.closure-policy" =>
+          for
+            start <- required(node, "start")
+            end <- required(node, "end")
+            stepCount <- parsePositiveInt(node.attrs.get("step-count"), "bootstrap closure step-count")
+            ordering <- required(node, "ordering")
+            reproduction <- required(node, "reproduction")
+            deltaDecoding <- required(node, "delta-decoding")
+            dependency <- required(node, "dependency")
+            validation <- required(node, "validation")
+            snapshot <- required(node, "snapshot")
+            failure <- required(node, "failure")
+            report <- required(node, "report")
+          yield BootstrapClosurePolicy(start, end, stepCount, ordering, reproduction, deltaDecoding, dependency, validation, snapshot, failure, report)
+        case Some(node) => Left(s"${PolicyEntity.value} is ${node.kind}, not bootstrap.closure-policy")
+        case None => Left(s"missing ${PolicyEntity.value}")
+
+    def steps(graph: Graph): Vector[BootstrapDerivationStep] =
+      graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId)
+          .filter(_.kind == "bootstrap.derivation-step")
+          .flatMap(node => decodeStep(entity, node).toOption)
+      }
+
+    def definitionErrors(graph: Graph): Vector[String] =
+      val errors = Vector.newBuilder[String]
+      val policyPresent = graph.entity(PolicyEntity).isDefined
+      val rawSteps = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, nodeId) =>
+        graph.nodes.get(nodeId).filter(_.kind == "bootstrap.derivation-step").toVector.map(node => entity -> decodeStep(entity, node))
+      }
+      val closurePresent = policyPresent || rawSteps.nonEmpty || graph.entity(ManifestEntity).isDefined
+      if !closurePresent then Vector.empty
+      else
+        val decodedPolicy = policy(graph)
+        decodedPolicy match
+          case Left(error) => errors += s"invalid bootstrap closure policy: $error"
+          case Right(p) =>
+            if p.start != "F0" then errors += s"bootstrap closure must start at F0, found ${p.start}"
+            if p.end != "F10" then errors += s"bootstrap closure must end at F10, found ${p.end}"
+            if p.stepCount != 10 then errors += s"bootstrap closure must contain 10 steps, found ${p.stepCount}"
+            if p.ordering != "ordinal" then errors += s"bootstrap closure ordering must be ordinal, found ${p.ordering}"
+            if p.reproduction != "predecessor-plus-delta" then errors += s"bootstrap closure reproduction must be predecessor-plus-delta, found ${p.reproduction}"
+            if p.deltaDecoding != "strict-canonical" then errors += s"bootstrap closure delta decoding must be strict-canonical, found ${p.deltaDecoding}"
+            if p.dependency != "exact-predecessor-change" then errors += s"bootstrap closure dependency policy must be exact-predecessor-change, found ${p.dependency}"
+            if p.validation != "full" then errors += s"bootstrap closure validation must be full, found ${p.validation}"
+            if p.snapshot != "successor-forbidden" then errors += s"bootstrap closure snapshots must be successor-forbidden, found ${p.snapshot}"
+            if p.failure != "fail-closed" then errors += s"bootstrap closure failure policy must be fail-closed, found ${p.failure}"
+            if p.report != "canonical-v1" then errors += s"bootstrap closure report must be canonical-v1, found ${p.report}"
+
+        ComponentEntities.toVector.sortBy(_.value).foreach { entity =>
+          graph.entity(entity) match
+            case Some(node) if node.kind == "bootstrap.closure-component" => ()
+            case Some(node) => errors += s"bootstrap closure component ${entity.value} has kind ${node.kind}"
+            case None => errors += s"bootstrap closure lacks component ${entity.value}"
+        }
+
+        graph.entity(ManifestEntity) match
+          case Some(node) if node.kind == "bootstrap.closure-manifest" => ()
+          case Some(node) => errors += s"${ManifestEntity.value} has kind ${node.kind}"
+          case None => errors += s"missing ${ManifestEntity.value}"
+
+        Vector(
+          EntityId("bootstrap.reproducer") -> "bootstrap.clean-room-reproducer",
+          EntityId("bootstrap.verifier") -> "bootstrap.closure-verifier",
+          EntityId("bootstrap.report") -> "bootstrap.closure-report"
+        ).foreach { case (entity, expectedKind) =>
+          graph.entity(entity) match
+            case Some(node) if node.kind == expectedKind => ()
+            case Some(node) => errors += s"${entity.value} has kind ${node.kind}, expected $expectedKind"
+            case None => errors += s"missing ${entity.value}"
+        }
+
+        rawSteps.foreach {
+          case (entity, Left(error)) => errors += s"invalid bootstrap derivation step ${entity.value}: $error"
+          case _ => ()
+        }
+        val good = rawSteps.collect { case (_, Right(step)) => step }.sortBy(_.ordinal)
+        decodedPolicy match
+          case Right(p) =>
+            if good.size != p.stepCount then errors += s"bootstrap closure has ${good.size} valid steps, expected ${p.stepCount}"
+            if good.map(_.ordinal) != (1 to p.stepCount).toVector then errors += "bootstrap closure ordinals are not exactly 1..step-count"
+            if good.map(_.foundation).distinct.size != good.size then errors += "bootstrap closure contains duplicate foundations"
+            good.zipWithIndex.foreach { case (step, index) =>
+              val expectedFoundation = s"F${index + 1}"
+              val expectedPredecessor = if index == 0 then p.start else s"F$index"
+              if step.foundation != expectedFoundation then errors += s"bootstrap step ${step.ordinal} foundation ${step.foundation} != $expectedFoundation"
+              if step.predecessor != expectedPredecessor then errors += s"bootstrap step ${step.ordinal} predecessor ${step.predecessor} != $expectedPredecessor"
+              if step.resource != s"/trellis/foundations/${step.foundation}.delta" then errors += s"bootstrap step ${step.ordinal} has noncanonical resource ${step.resource}"
+              if step.snapshot != "forbidden" then errors += s"bootstrap step ${step.ordinal} permits a successor snapshot"
+              if !isHash(step.predecessorRoot) then errors += s"bootstrap step ${step.ordinal} has invalid predecessor root"
+              if !isHash(step.deltaId) then errors += s"bootstrap step ${step.ordinal} has invalid delta id"
+              if !isHash(step.successorRoot) then errors += s"bootstrap step ${step.ordinal} has invalid successor root"
+              if index == 0 then
+                if step.dependency.nonEmpty then errors += "bootstrap F1 step must have no delta dependency"
+              else
+                val previous = good(index - 1)
+                if step.predecessorRoot != previous.successorRoot then errors += s"bootstrap step ${step.ordinal} does not consume the previous successor root"
+                if step.dependency != Some(previous.deltaId) then errors += s"bootstrap step ${step.ordinal} does not depend on the previous delta"
+
+              graph.entities.get(ManifestEntity).foreach { manifestId =>
+                val portName = f"step${step.ordinal}%02d"
+                val incoming = graph.incoming(PortRef(manifestId, portName))
+                val expectedNode = graph.entities.get(step.entity)
+                if incoming.size != 1 || expectedNode.forall(id => incoming.headOption.forall(_._2.from.node != id)) then
+                  errors += s"bootstrap manifest does not bind ${step.foundation} at $portName"
+              }
+            }
+            if good.lastOption.exists(_.foundation != p.end) then errors += s"bootstrap closure does not end at ${p.end}"
+          case Left(_) => ()
+
+        errors.result()
+
+    private def decodeStep(entity: EntityId, node: Node): Either[String, BootstrapDerivationStep] =
+      for
+        ordinal <- node.attrs.get("ordinal").flatMap(_.toIntOption).filter(_ > 0).toRight(s"${entity.value} lacks positive ordinal")
+        foundation <- required(node, "foundation")
+        predecessor <- required(node, "predecessor")
+        predecessorRoot <- required(node, "predecessor-root")
+        deltaId <- required(node, "delta-id")
+        dependencyRaw <- required(node, "dependency")
+        dependency <- if dependencyRaw == "none" then Right(None) else if isHash(dependencyRaw) then Right(Some(dependencyRaw)) else Left(s"${entity.value} has invalid dependency")
+        successorRoot <- required(node, "successor-root")
+        resource <- required(node, "resource")
+        snapshot <- required(node, "snapshot")
+      yield BootstrapDerivationStep(entity, ordinal, foundation, predecessor, predecessorRoot, deltaId, dependency, successorRoot, resource, snapshot)
+
+    private def required(node: Node, key: String): Either[String, String] =
+      node.attrs.get(key).filter(_.nonEmpty).toRight(s"bootstrap closure node lacks $key")
+
+    private def parsePositiveInt(value: Option[String], label: String): Either[String, Int] = value match
+      case Some(raw) => raw.toIntOption.filter(_ > 0).toRight(s"$label must be a positive integer, found $raw")
+      case None => Left(s"missing $label")
+
+    private def isHash(value: String): Boolean = HashPattern.pattern.matcher(value).matches()
+
   def validate(graph: Graph): Vector[String] =
     val errors = Vector.newBuilder[String]
     errors ++= ResourceRules.definitionErrors(graph)
@@ -1310,6 +1492,7 @@ object Check:
     errors ++= DeltaNetRuntimeRules.definitionErrors(graph)
     errors ++= DeltaNetParallelRules.definitionErrors(graph)
     errors ++= DeltaNetEvidenceRules.definitionErrors(graph)
+    errors ++= BootstrapClosureRules.definitionErrors(graph)
 
     graph.edges.foreach { case (edgeId, edge) =>
       val fromNode = graph.nodes.get(edge.from.node)
