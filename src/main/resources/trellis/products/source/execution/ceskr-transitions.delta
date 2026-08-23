@@ -1,0 +1,127 @@
+delta-change "ceskr-transitions"
+message "add graph-generated CESK-R transitions"
+author "bootstrap"
+doc "guide" """
+  |# CeskrTransitions: graph-generated CESK-R transitions
+  |
+  |CeskrTransitions is a post-constitution product delta layered over SessionProtocols. It does
+  |not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Purpose
+  |
+  |CeskrTransitions generates a bounded CESK-R derivation from graph rules before
+  |interpreting a semantic expression. Rules are selected by exact expression form
+  |and retain stable identities in the resulting transition path.
+  |
+  |## Configuration vocabulary
+  |
+  |The graph defines first-class components for control, environment,
+  |continuation, resources, and transitions. CeskrTransitions inherits lexical values and
+  |environments from LambdaMatchSemantics, process resources from AsyncProcesses, and session
+  |contracts from SessionProtocols.
+  |
+  |## Rule table
+  |
+  |Bool0 selects one rule for each semantic form:
+  |
+  |```text
+  |reference -> lookup-environment
+  |lambda    -> close-environment
+  |apply     -> evaluate-function-then-argument
+  |construct -> evaluate-fields-left-to-right
+  |match     -> evaluate-scrutinee-then-select
+  |```
+  |
+  |The generator walks control before children, chooses exactly one rule per form,
+  |and records `CeskrTransition(index, rule, control, action)`. Missing, duplicate,
+  |or unsupported rules fail closed.
+  |
+  |## Policy
+  |
+  |`ceskr.bool0.policy` selects exact-form rules, control-before-children order,
+  |inherited resources, strict failure, and a maximum of 256 transitions. Cyclic
+  |control graphs and derivations beyond the bound are rejected.
+  |
+  |## Interpretation
+  |
+  |After generating the rule path, CeskrTransitions interprets the expression with the
+  |LambdaMatchSemantics evaluator. Admission requires both frozen witnesses:
+  |
+  |```text
+  |identity(true) -> True
+  |flip(identity(true)) -> False
+  |```
+  |
+  |This preserves a separate, inspectable graph-rule derivation while retaining
+  |the established value semantics. Canonical trace encoding remains CeskrTraces.
+  |
+  |## Invariants
+  |
+  |CeskrTransitions tests enforce canonical derivation, first-class CESK-R vocabulary,
+  |deterministic rule ordering, witness value parity, fail-closed malformed rules,
+  |SessionProtocols session compatibility, and frozen F0-F11 identity.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |CeskrTransitions.delta
+  |a5e999f9701804b43c77e39860d21ebd7d5bca98bfeae715d7564796b11e1cb0
+  |
+  |CeskrTransitions root
+  |c108a619ff980490e7d502dd8d038b422438e9698876ae2a65e5f20307d9ef08
+  |
+  |615 nodes
+  |783 edges
+  |615 entities
+  |28 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "session-protocols"
+  assert "introduces" "ceskr-transitions.schema" "grammar.schema"
+depends "session-protocols"
+  entity "ceskr-transitions.schema" "grammar.schema"
+    attr "extends" "SessionProtocols"
+    attr "name" "CeskrTransitions"
+    attr "purpose" "graph-generated-ceskr-transitions"
+  entity "ceskr16.schema" "ceskr.schema"
+    attr "name" "CESKR16"
+    attr "selection" "exact-form"
+  components "language.component" "CeskrTransitions"
+    component "ceskr-machine" "CESKRMachine"
+  components "semantics.component" "CeskrTransitions"
+    component "ceskr-control" "Control"
+    component "ceskr-environment" "Environment"
+    component "ceskr-continuation" "Continuation"
+    component "ceskr-resources" "Resources"
+    component "ceskr-transition" "Transition"
+  entity "ceskr.bool0.policy" "language.ceskr-policy"
+    attr "failure" "strict"
+    attr "language" "language.bool0"
+    attr "max-transitions" "256"
+    attr "order" "control-before-children"
+    attr "resources" "inherited"
+    attr "selection" "exact-form"
+  entity "ceskr.bool0.rule.reference" "language.ceskr-rule"
+    attr "action" "lookup-environment"
+    attr "form" "language.expr.reference"
+    attr "language" "language.bool0"
+  entity "ceskr.bool0.rule.lambda" "language.ceskr-rule"
+    attr "action" "close-environment"
+    attr "form" "language.expr.lambda"
+    attr "language" "language.bool0"
+  entity "ceskr.bool0.rule.apply" "language.ceskr-rule"
+    attr "action" "evaluate-function-then-argument"
+    attr "form" "language.expr.apply"
+    attr "language" "language.bool0"
+  entity "ceskr.bool0.rule.construct" "language.ceskr-rule"
+    attr "action" "evaluate-fields-left-to-right"
+    attr "form" "language.expr.construct"
+    attr "language" "language.bool0"
+  entity "ceskr.bool0.rule.match" "language.ceskr-rule"
+    attr "action" "evaluate-scrutinee-then-select"
+    attr "form" "language.expr.match"
+    attr "language" "language.bool0"
