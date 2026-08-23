@@ -40,10 +40,11 @@ Inline changes are compiled to the same canonical `Change` representation as
 included fragments. Package imports therefore operate on graph data and
 capabilities, not Scala inheritance.
 
-Includes are relative, ordered, and may not be absolute or contain `..`.
+Includes are relative and may not be absolute or contain `..`.
 Package includes point directly at authoritative `.delta` files. The
-Scala catalog compiles every fragment in memory, derives dependency order,
-replays the chain from F11, and validates each result. No `.tdc` artifact is
+Scala catalog compiles every fragment in memory, derives source dependency
+order from F11, and validates each result. Consumer assemblies may select and
+reissue a subset over another deterministic frontier. No `.tdc` artifact is
 checked into the repository or loaded by application code.
 
 Every fragment is authored under `trellis/products/source` in the symbolic,
@@ -104,10 +105,14 @@ names or version numbers. `validate-graph` runs the constitutional graph checker
 from `trellis/profiles`. The `full` profile resolves all current fragments using
 capabilities alone and produces a canonical selection lock.
 
-This arrangement keeps the frozen change history and byte-level parity while
-making the maintained product structure readable through nine chain-aligned
-capability packages.
+This arrangement keeps the frozen foundation ceremony and byte-level parity
+while making post-foundation products readable and selectable through
+capability packages and assemblies.
 
 Only the foundational F0–F11 ceremony remains named and frozen in host code.
 Post-foundation hashes and graph roots are observations computed by the catalog,
 not constants that must be synchronized with resources.
+
+Accumulated node, edge, and entity counts are likewise assembly diagnostics.
+They do not belong in a composable feature delta because cherry-picking the same
+delta onto another branch produces a different materialized graph.

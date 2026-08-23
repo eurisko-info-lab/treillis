@@ -1,63 +1,99 @@
 # Trellis Bootstrap
 
-A deliberately small Scala 3 bootstrap kernel for a graph-native, AI-authored programming system.
+Trellis is a graph-native, content-addressed programming substrate. Typed
+semantic graphs are canonical; readable `.delta` files describe graph changes,
+packages select capabilities, and assemblies build consumer-specific graph
+branches. Text, SVG, Typst, and the Squeak-like browser are projections or
+editing surfaces rather than competing sources of truth.
 
-Trellis does **not** treat text files as canonical source. The canonical object is a typed semantic graph living in a Pijul-like immutable change DAG. A local project begins as a branch from a published global frontier. Humans navigate and review semantic projections; AI agents author `ΔTrellis` changes.
+## Architecture
 
-## Bootstrap boundary
+```text
+frozen F0–F11 foundation
+          +
+readable, documented, tested feature deltas
+          ↓ capability resolution
+canonical selection lock
+          ↓ assembly compilation
+consumer graph branch
+          ↓
+language package / DeltaNet / CESK-R / Trellis Squeak
+```
 
-The Scala implementation is intentionally only ten production source files:
+The implementation separates:
 
-1. `Core.scala` — graph, ports, types, capabilities, IDs.
-2. `Canon.scala` — canonical encoding and SHA-256 content addressing.
-3. `Delta.scala` — free Trellis change language.
-4. `Repo.scala` — change DAG, branch frontiers, materialization, publication model.
-5. `Check.scala` — graph/resource invariants.
-6. `Machine.scala` — tiny CESK-R-style reference resource machine.
-7. `Navigate.scala` — semantic selections and navigation.
-8. `Project.scala` — SVG, Typst, and code-like projections.
-9. `Bootstrap.scala` — initial self-describing semantic universe.
-10. `Main.scala` — demo CLI.
+- `trellis.storage`: graphs, changes, branches, publication, packages, profiles,
+  and assemblies;
+- `trellis.language`: replaceable syntax and lowering contracts;
+- `trellis.languages.trellis`: the table-described Trellis parser and printer;
+- `trellis.ir`: validated execution IR;
+- `trellis.engine`: parallel DeltaNet and sequential CESK-R engines;
+- `trellis.squeak`: the assembly-backed live graph image.
 
-The design pressure is intentional: new language features should become Trellis graph data, laws, changes, or derived machines rather than new Scala subsystems.
+Foundation deltas retain their frozen canonical wire encoding because they are
+verified before the readable delta language exists. Post-foundation `.delta`
+files are human-readable and contain their guide and executable contract.
+Optional `.tdc` files are generated exchange artifacts and are never source.
 
-## Toolchain
+## Requirements
 
-- Scala 3.3.8 LTS
+- Scala 3.3.8
 - sbt 1.12.15
-- JDK 21+
-- No runtime/test library dependencies
+- JDK 17 or newer
+- Rust/Cargo for the independent verifier and Squeak web shell
 
-## Run
+There are no Scala runtime or test-library dependencies.
+
+## Validate
 
 ```bash
-sbt run
 sbt "Test/runMain trellis.TestMain"
+./scripts/verify-bootstrap-parity.sh
+cargo test --manifest-path rust/delta-web/Cargo.toml
 ```
 
-Generate projections:
+## Assemblies
+
+List, inspect, or compile graph assemblies:
 
 ```bash
-sbt "run svg examples/bootstrap.svg"
-sbt "run typst examples/bootstrap.typ"
-sbt "run dump" > examples/bootstrap.canon.txt
+sbt "runMain trellis.Main assemblies"
+sbt "runMain trellis.Main assembly squeak-debug"
+sbt "runMain trellis.Main compile-assembly squeak-debug /tmp/squeak.canon"
 ```
 
-## What this proves already
+An assembly requests capabilities and emits a reproducible selected graph. The
+IDE consumes that assembled graph; it does not scan source deltas and invent a
+product chain.
 
-The bootstrap demonstrates the architectural seam, not a complete language implementation:
+## Trellis Squeak
 
-- generic semantic graph rather than a hard-coded AST;
-- immutable content IDs;
-- entity lineage distinct from immutable content identity;
-- a free semantic change language;
-- concurrent-change conflict detection;
-- branch materialization from a basis + frontier;
-- resource fan-out validation for affine/linear capabilities;
-- explicit move/borrow/drop/channel ownership in the reference machine;
-- semantic navigation independent of files;
-- SVG and Typst as projections with semantic IDs.
+Start the local image service and web shell:
 
-See `docs/` for the tutorial, specification, bootstrap contract, and next milestones.
-The Squeak-like live graph image and assembly model are described in
-[`docs/ASSEMBLIES.md`](docs/ASSEMBLIES.md).
+```bash
+./scripts/run-squeak.sh
+```
+
+Open <http://127.0.0.1:8421/>, search for `fib`, and open the Fibonacci System
+Browser workspace. Transcript edits accumulate in one temporary open delta.
+Commit seals that delta as one immutable change and opens a fresh delta;
+Publish separately submits a clean closed frontier to graph-defined publication
+policy.
+
+The current Transcript edits graph entities; the workspace runner evaluates
+stored Trellis IR through DeltaNet or CESK-R. This is Squeak-like workflow
+infrastructure, not yet a Smalltalk parser or virtual machine; see
+[SQUEAK-IMAGE.md](docs/SQUEAK-IMAGE.md).
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Assemblies and live branches](docs/ASSEMBLIES.md)
+- [Bootstrap ceremony](docs/BOOTSTRAP.md)
+- [Delta composition](docs/DELTA-COMPOSITION.md)
+- [Readable delta sets](docs/DELTA-SETS.md)
+- [Foundation staircase](docs/FOUNDATION.md)
+- [Squeak image](docs/SQUEAK-IMAGE.md)
+- [Trellis syntax](docs/TRELLIS-SYNTAX.md)
+- [Tutorial](docs/TUTORIAL.md)
+- [Validation](docs/VALIDATION.md)

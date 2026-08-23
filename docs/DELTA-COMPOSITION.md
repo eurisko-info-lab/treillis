@@ -21,7 +21,7 @@ LanguageBootstrap–SessionProtocols changes over F11 and omits CeskrTransitions
 changes. `debug` extends that selection with CeskrTransitions/17. The F11 DeltaNet
 capability is recorded explicitly as basis-provided in the production lock.
 
-`production-ide` now selects 34 of the 37 real source fragments, omitting
+`production-ide` selects the IDE capability closure while omitting
 CeskrTransitions, CeskrTraces, and DifferentialCertificates. `SelectionCompiler` deterministically
 reissues selected operations over the selected predecessor frontier, validates
 every intermediate graph, and records every source-ID to compiled-ID derivation.
@@ -29,8 +29,9 @@ The resulting graph contains SqueakNavigator, Squeak runtime, storage, and Fibon
 while physically excluding CESK-R, trace, and differential-certificate nodes.
 Replaying the compiled lock reproduces its graph root.
 
-The CLI exposes `profiles`, `profile NAME`, and `compile-profile NAME` without
-profile-specific branches.
+The CLI exposes `profiles`, `profile NAME`, `compile-profile NAME`,
+`assemblies`, `assembly NAME`, and `compile-assembly NAME [OUTPUT]` without
+consumer-specific branches.
 
 `common.lambda` is now an inline, human-readable delta package. The manifest
 grammar's generic `change`, `entity`, and `attr` constructs compile it into a
@@ -49,39 +50,41 @@ change IDs and deterministic application order.
 ```text
 delta-package common.lambda
   provides language.core.lambda
-  include source/Lambda.delta
+  change add common Lambda Calculus
+    entity common.lambda.schema language.package
+      attr name Lambda Calculus
     post-action validate-graph
 
 delta-package language.trellis
   imports language.core.lambda
   provides language.trellis.syntax
   provides language.trellis.lowering
-  include source/TrellisSyntax.delta
+  include source/language/language-bootstrap.delta
     post-action validate-graph
-  include source/TrellisLowering.delta
+  include source/language/lambda-match-semantics.delta
     post-action validate-graph
 
 delta-package execution.deltanet
   requires language.trellis.lowering
   provides execute.parallel
-  include source/DeltaNet.delta
+  include source/optimization/deltanet-lowering.delta
     post-action validate-graph
 
 delta-package execution.ceskr
   requires language.trellis.lowering
   provides execute.sequential
   provides debug.trace
-  include source/Ceskr.delta
+  include source/execution/ceskr-transitions.delta
     post-action validate-graph
 
 profile production
-  require language.trellis.syntax
-  require execute.parallel
+  requires language.trellis.syntax
+  requires execute.parallel
 
 profile debug
   extends production
-  require execute.sequential
-  require debug.trace
+  requires execute.sequential
+  requires debug.trace
 ```
 
 Resolving `production` excludes CESK-R naturally: no requested capability has
@@ -107,10 +110,12 @@ The lock—not the source profile—is the exchange/reproduction artifact. Profi
 guidance may choose among valid providers using size, latency, platform, or
 observed execution data, but every choice becomes explicit in the lock.
 
-## Required delta refactor
+## Fragment independence
 
-The current post-foundation products form one predecessor chain. Optional
-selection requires orthogonal fragments instead:
+Authoritative product sources still retain a derivation order for reproducible
+catalog compilation. Consumer selection does not have to reproduce the entire
+history: selected operations are reissued over the chosen assembly frontier.
+The long-term unit remains an orthogonal fragment such as:
 
 - common Lambda Calculus data and laws;
 - Trellis syntax and lowering;
@@ -120,7 +125,7 @@ selection requires orthogonal fragments instead:
 - debugger UI;
 - examples.
 
-Fragments must depend only on the bases they actually consume. Independent
+Fragments should depend only on the bases they actually consume. Independent
 fragments may have several content dependencies and must compose without
 overlapping writes, unless an explicit deterministic merge policy admits the
 overlap.
@@ -142,3 +147,11 @@ and print-rule data interpreted by one generic lexer/parser/printer. Adding
 must add grammar entries rather than another directive-specific parser branch.
 Round-trip identity and static checks for left recursion and ambiguous providers
 are part of validation.
+
+## Assembly boundary
+
+Profiles express reusable capability policy. Assemblies adapt that policy to a
+consumer by declaring a foundation, additional or omitted capabilities,
+exposed entry points, verification, and output forms. The canonical lock and
+compiled graph—not an accumulated feature root printed in a guide—identify the
+result.

@@ -1,6 +1,7 @@
-# Squeak spatial syntax
+# Trellis Squeak image
 
-Squeak presents Trellis objects as one structured space rather than parallel
+Trellis Squeak is a Smalltalk-inspired live image for graph branches. It
+presents Trellis objects as one structured space rather than parallel
 text and graph documents. Text is the dense glyph for a semantic subgraph;
 containers, boundary ports, and wires expose structure that text normally
 hides.
@@ -26,6 +27,21 @@ language. Editing an expression rewires its semantic subgraph; rewiring a port
 rewrites the expression's textual glyph. Neither presentation is a second
 source of truth.
 
+## Image and transcript lifecycle
+
+The image starts from the graph produced by `squeak-debug.assembly`. It does not
+scan every source delta. Its state is:
+
+```text
+assembled basis + closed local frontier + open workspace delta
+```
+
+Transcript edits append graph operations to the open delta. All browser,
+inspector, projection, and execution reads see the overlay. Commit validates
+and seals the complete open delta as one content-addressed change, advances the
+local branch, records the event in the transcript, and opens an empty delta.
+Publish is deliberately separate and rejects dirty workspaces.
+
 The first Squeak implementation renders the Fibonacci workspace with function
 and nested-function containers, boundary ports, pattern regions, textual
 expressions, and reference/result wires. The `IR` tab remains a diagnostic
@@ -45,9 +61,23 @@ trampoline. CESK-R evaluates strictly left-to-right and records a debug trace of
 control, environment, continuation depth, and resource domain for every
 reduction. Both must return the same observable Nat.
 
-Squeak reaches the Scala engines through the loopback Squeak execution
-service; the Rust delta browser only proxies the request. The browser contains
-no evaluator. Start both services with `scripts/run-squeak.sh`.
+Squeak reaches the Scala engines through the loopback image service. The Rust
+web shell serves the UI and proxies image, edit, commit, publish, and execution
+requests; it contains no graph assembler or evaluator. Start both services with
+`scripts/run-squeak.sh`.
+
+## Smalltalk status
+
+The interaction model is Squeak-like, but a Smalltalk language package is not
+implemented yet. The current Transcript's **Do it** stages the entered source
+as an attribute of the named graph entity; it does not parse or execute
+Smalltalk expressions. DeltaNet and CESK-R execute the selected graph-resident
+Trellis IR, including the Fibonacci example.
+
+Genuine Smalltalk support requires graph-defined Smalltalk syntax and method
+lookup, an object/class/block model, lowering or an accepted Smalltalk IR, and
+evaluator actions for **Do it**, **Print it**, **Inspect it**, and method
+acceptance. Until then the Transcript is a live graph-change workspace.
 
 ## Layout stress cases
 

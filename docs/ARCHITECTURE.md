@@ -1,10 +1,12 @@
 # Architecture: repository, languages, IR, and engines
 
-Trellis Bootstrap is split across four explicit boundaries.
+Trellis Bootstrap has five explicit boundaries.
 
 ```text
 language-neutral Repository
-          ↓ supplies Graph basis
+          ↓ supplies Graph basis and branch
+capability packages + Assembly
+          ↓ select one consumer graph
 replaceable LanguagePackage
           ↓ produces versioned LoweredProgram
        Execution IR
@@ -18,7 +20,9 @@ replaceable ExecutionEngine
 parser, concrete language, IR evaluator, or execution engine. The existing
 content-addressed repository, branches, publication ledger, replicated CAS,
 signatures, consensus, discovery, and attestations remain storage products.
-Their frozen graph and delta identities are unchanged by the package split.
+Only F0–F11 carry host-checked frozen identities. Post-foundation roots are
+computed properties of a selected branch, not constants embedded in feature
+documentation.
 
 ## Languages
 
@@ -46,10 +50,23 @@ same engine-neutral result shape. The Squeak runtime resolves engines through
 
 ## Product assembly
 
-Historical product graphs remain assembled from canonical deltas, but their
-identities are baselines rather than architectural constraints. Reorganization
-may deliberately establish new roots and freeze those new roots.
+Packages provide and require capabilities. Profiles establish reusable
+selection policies. An assembly names a foundation, inherits a profile, adds or
+omits capabilities, declares consumer entry points, requests verification, and
+chooses emitted artifacts. Resolution produces a canonical lock; compilation
+reissues selected source changes over a deterministic frontier.
 
-Trellis AST-to-IR lowering is the next missing implementation behind
-`TrellisLanguage.lower`; its explicit failure prevents source parsing from
-being mistaken for executable lowering.
+The Squeak image receives the resulting graph and lock. The web shell no longer
+scans `.delta` sources or assumes that every feature belongs to one linear
+product history.
+
+## Live branches
+
+A Squeak workspace consists of an assembled basis, a local immutable change
+frontier, and one mutable open delta. Reads and execution see the overlay.
+Commit validates and seals the open delta, advances the local frontier, and
+opens a clean delta. Publication is separate and requires a clean workspace.
+
+The worked Fibonacci definition is stored as graph-resident IR and is consumed
+by both engines. General Trellis AST-to-IR lowering remains a separate typed
+phase; source parsing must not be mistaken for lowering or execution.

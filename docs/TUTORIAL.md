@@ -21,7 +21,18 @@ A selection is an entity, immutable node, edge, change, branch, or publication. 
 
 The bootstrap exposes this through `Navigate.Selection` and `Navigate.neighborhood`.
 
-## 3. AI edits with `ΔTrellis`
+## 3. Open a Squeak image
+
+An assembly chooses the consumer graph. Start the debug image with:
+
+```bash
+./scripts/run-squeak.sh
+```
+
+Search for `fib` and open the workspace. The System Browser, Graph, IR, Typst,
+and Debug views are projections of the same assembled graph.
+
+## 4. Edit with `ΔTrellis`
 
 An AI does not rewrite a `.trellis` file. It proposes a change:
 
@@ -32,9 +43,14 @@ AddRoot(...)
 RefineHole(...)
 ```
 
-The change is immutable and content-addressed. The repository checks concurrent footprints before materialization so unrelated changes commute while overlapping semantic edits become explicit conflicts.
+In the Transcript these operations first accumulate in a mutable open delta.
+Commit validates and seals them as one immutable, content-addressed change.
+Publish is a later operation governed by the selected graph's publication
+policy. The repository checks concurrent footprints before materialization so
+unrelated changes commute while overlapping semantic edits become explicit
+conflicts.
 
-## 4. Read the graph in several lenses
+## 5. Read the graph in several lenses
 
 `Project.scala` implements the first three projections:
 
@@ -44,7 +60,7 @@ The change is immutable and content-addressed. The repository checks concurrent 
 
 None is canonical source.
 
-## 5. Resource ownership is graph structure
+## 6. Resource ownership is graph structure
 
 Ports carry types and structural modes:
 
@@ -56,9 +72,13 @@ Linear:       duplicate no,  discard no
 
 The validator rejects an affine or linear output port with implicit fan-out. Duplication must therefore be explicit and legal.
 
-## 6. Reference execution does not need tracing GC
+## 7. Execute through selected engines
 
-`Machine.scala` contains a deliberately tiny CESK-R-like resource machine. A resource has exactly one current owner, which can be a process or channel queue.
+DeltaNet provides the parallel path; CESK-R provides deterministic sequential
+execution and traces. Both consume validated graph IR rather than dispatching
+on example names. `Machine.scala` also contains the constitutional resource
+machine. A resource has exactly one current owner, which can be a process or
+channel queue.
 
 A representative trace is:
 
@@ -71,6 +91,12 @@ recv job -> worker
 
 The queue temporarily owns the affine resource. No reachability scan discovers its lifetime.
 
-## 7. Bootstrap the rest
+## 8. Distinguish Squeak from Smalltalk
+
+The current image adopts a Squeak-style System Browser and Transcript workflow,
+but no Smalltalk parser or VM exists yet. **Do it** currently stages graph
+source. Stored Trellis IR can be executed with DeltaNet or CESK-R.
+
+## 9. Bootstrap the rest
 
 `Bootstrap.scala` stores semantic concepts such as `core.move`, `core.borrow.shared`, `repo.change`, and `projection.svg` as ordinary graph entities. The goal is to move increasingly rich language/runtime/projection definitions into Trellis itself while the Scala kernel remains small.

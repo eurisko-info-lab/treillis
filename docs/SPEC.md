@@ -24,7 +24,8 @@ Required law:
 same semantic graph => byte-identical canonical encoding => same hash
 ```
 
-A production version must add a decoder and adversarial canonical-decoding tests before publication is trusted.
+Scala and the independent Rust verifier implement strict decoders and share
+adversarial canonical fixtures.
 
 ## Change language
 
@@ -92,17 +93,49 @@ Resources have a mode, owner, and active loans. A channel can be an owner while 
 
 All projections return content plus semantic mappings. SVG elements embed graph IDs. Typst and Code View are noncanonical explanatory views.
 
-## Not yet trusted/implemented
+## Packages, profiles, and assemblies
+
+A package provides capabilities and may require/import other capabilities. A
+profile requests a reusable capability closure. Resolution chooses providers,
+rejects ambiguity/conflicts, topologically orders fragments, and emits a
+canonical selection lock.
+
+An assembly names the foundation and base profile, adds or omits capabilities,
+declares exposed consumer entry points, verification names, and emitted forms.
+Assembly compilation reissues selected changes over a deterministic frontier;
+the resulting root and graph size belong to that assembly result, not to any
+individual feature delta.
+
+## Live workspace
+
+```text
+Workspace = assembled basis + closed local frontier + open delta
+```
+
+The open delta is mutable and local. Commit validates and seals it as one
+immutable change. Publish is separate, requires a clean workspace, and is
+admitted by graph-defined namespace, publisher, signature, and ledger policy.
+
+## Implemented beyond the initial bootstrap
+
+- strict canonical decoding and hostile fixtures;
+- F0–F11 clean-room closure and Scala/Rust parity;
+- graph-defined process, session, CESK-R, projection, equality, DeltaNet, and
+  evidence policies;
+- deterministic parallel DeltaNet and sequential CESK-R execution;
+- simulated distributed CAS, signed publications, consensus, discovery, and
+  artifact attestations;
+- readable self-documenting/self-testing feature deltas;
+- capability packages, profiles, canonical locks, and graph assemblies;
+- assembly-backed Squeak image with an open-delta transcript lifecycle.
+
+## Remaining limitations
 
 The bootstrap intentionally leaves these for subsequent slices:
 
-- canonical decoder;
-- persistent CAS;
 - full Pijul-like patch algebra and conflict representation;
-- session/protocol calculus;
-- graph-defined CESK rules;
-- e-graph derivation/extraction;
-- DeltaNet lowering/runtime;
-- real global blockchain consensus;
-- cryptographic publisher identities;
-- native Trellis Squeak.
+- durable external repository/CAS persistence;
+- production network consensus and key management;
+- general Trellis AST-to-IR lowering;
+- a Smalltalk language package and VM for genuine Transcript evaluation;
+- complete named assembly verification/emission backend dispatch.

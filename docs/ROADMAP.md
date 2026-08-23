@@ -1,4 +1,9 @@
-# Roadmap
+# Roadmap and implementation status
+
+Slices A–G describe the architectural milestones and graph layers; some bullets
+are complete graph models while others still need production persistence or
+external integration. Remaining engineering work is collected at the end
+rather than represented as another frozen product number.
 
 ## Slice A — harden the repository kernel
 
@@ -37,12 +42,6 @@ LspAdapter delivers the deferred LSP adapter after the global-network slice,
 preserving every frozen predecessor identity while exposing semantic symbols
 and exact definition locations over the Code View.
 
-## Slice G — worked semantic examples
-
-FibonacciWorkspace begins a worked-example layer with accumulator-style tail recursion
-and focused SVG and Typst projections. The Squeak shell now brings the readable
-Fibonacci definition and both rendered projections into one tabbed workspace.
-
 ## Slice E — optimization and execution
 
 - resource-aware e-graph derivation;
@@ -74,3 +73,24 @@ FibonacciWorkspace begins with accumulator-style Fibonacci. Squeak discovers its
 workspace node through ordinary search, traverses the reachable graph on
 demand, and generates Graph, Trellis, UML-like SVG, and Typst views live from
 semantic data.
+
+## Slice H — assemblies and live images
+
+- capability-selected graph assemblies;
+- canonical locks and deterministic selected-frontier compilation;
+- Squeak image fed by an assembly rather than source scanning;
+- mutable open workspace delta;
+- immutable commit/seal and separate publication lifecycle;
+- System Browser, Transcript, inspector/projection, and engine views.
+
+## Next
+
+- replace Transcript's generic graph staging with a real Smalltalk language
+  package, object model, method lookup, and evaluator;
+- implement general Trellis AST-to-IR lowering;
+- persist branches, changes, CAS objects, and transcript sessions across image
+  restarts;
+- expose graph conflict objects and interactive resolution;
+- execute every assembly `verify` and `emit` declaration through registered
+  backends;
+- harden network consensus, publisher keys, and remote discovery.

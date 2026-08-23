@@ -33,3 +33,8 @@ The manifest contains exactly ten ordered steps, F1 through F10. A step records:
 The closure policy requires strict canonical delta decoding, predecessor-plus-delta reproduction, full graph validation, exact dependencies, fail-closed behavior, and canonical reports.
 
 The clean-room verifier does not trust the already-materialized F1..F10 graphs. It starts from F0 and recomputes every successor. F11 remains a normal successor of F10 and therefore does not embed its own root in the closure manifest.
+
+Foundation roots are frozen constitutional evidence. In contrast,
+post-foundation roots and graph sizes are computed for a selected profile or
+assembly branch and must not be embedded as identities in composable feature
+deltas.

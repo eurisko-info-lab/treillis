@@ -55,3 +55,8 @@ Both implementations must reject every fixture.
 
 This is intentionally a cross-process and cross-language test. A failure in one
 implementation cannot be hidden by accepting the other implementation's output.
+
+The verifier is distinct from `rust/delta-web`. The verifier independently
+reconstructs frozen foundations from canonical wire deltas. The Squeak web
+shell deliberately performs no delta decoding or graph assembly; it receives
+the selected assembly graph from the Scala image service.
