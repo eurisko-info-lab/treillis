@@ -1,0 +1,291 @@
+delta-change "language-bootstrap"
+message "install LanguageBootstrap TemplateGrammar and DeltaLanguageBootstrap product layer over frozen F11"
+author "trellis-product"
+doc "guide" """
+  |# LanguageBootstrap / TemplateGrammar / ΔLanguageBootstrap
+  |
+  |This is the first product layer above the frozen F0–F11 bootstrap constitution. It is not F12.
+  |
+  |`LanguageBootstrap.delta` depends on the frozen F11 change and derives a product graph without modifying `Bootstrap.graph` or any foundation identity.
+  |
+  |## What is graph data
+  |
+  |The product graph defines:
+  |
+  |- `language-bootstrap.schema` — vocabulary for object-language definitions;
+  |- `template-grammar.schema` — vocabulary for interpreted bidirectional prefix grammars;
+  |- `delta-language-bootstrap.schema` — the free change schema associated with LanguageBootstrap artifacts;
+  |- the concrete `Bool0` language, its `Expr` sort and four constructors;
+  |- the concrete `Bool0Grammar` with four production templates;
+  |- `DeltaBool0`, a free specialization of constitutional `DeltaTrellis`;
+  |- graph-defined change operators including `replace-preserving-edges`.
+  |
+  |The example grammar is intentionally tiny:
+  |
+  |```text
+  |Expr := true
+  |      | false
+  |      | not Expr
+  |      | and Expr Expr
+  |```
+  |
+  |The graph stores these as production templates:
+  |
+  |```text
+  |lit:true
+  |lit:false
+  |lit:not;ref:value:Expr
+  |lit:and;ref:left:Expr;ref:right:Expr
+  |```
+  |
+  |## What remains host machinery
+  |
+  |`Language.scala` supplies a small generic interpreter. It discovers the language, grammar, constructors, productions, and associated change language through typed graph edges. It knows how to interpret the TemplateGrammar template vocabulary, but contains no `Bool0` parser cases.
+  |
+  |Parsing and printing use the same production set, giving the initial laws:
+  |
+  |```text
+  |parse(print(ast)) = ast
+  |print(parse(text)) = normalizeWhitespace(text)
+  |```
+  |
+  |for unambiguous TemplateGrammar inputs.
+  |
+  |## Free changes
+  |
+  |Every object language must have exactly one associated `language.change-language`. `DeltaBool0` declares `basis = DeltaTrellis` and exposes the underlying free generators used for semantic edits.
+  |
+  |`replace-preserving-edges` is derived tooling: it disconnects incident semantic edges, replaces an entity, and reconnects equivalent ports to the replacement content. Admission is fail-closed and revalidates both the constitutional graph laws and LanguageBootstrap laws.
+  |
+  |A test changes the `true` production to `yes` entirely through graph data. The generic parser then accepts `yes` and rejects `true` without parser code changes.
+  |
+  |## Frozen constitution boundary
+  |
+  |The product layer is deliberately separate:
+  |
+  |```text
+  |F0 ... F11             frozen constitution
+  |       |
+  |       + LanguageBootstrap.delta
+  |              |
+  |              v
+  |   LanguageBootstrap product graph
+  |```
+  |
+  |`Bootstrap.graph` remains exactly the frozen F11 graph.
+  |
+  |## Frozen slice identities
+  |
+  |```text
+  |LanguageBootstrap.delta  a9121d11a0a297e6d2d27cad840240c134fbcd1548606bc9ddb504fd20fb16fb
+  |LanguageBootstrap root   2ccc49718f50077ac12648eca2dae87c43543ace14314a799e1247e86bcc1421
+  |nodes            291
+  |edges            309
+  |entities         291
+  |```
+  |
+  |These identities are product-slice identities, not new foundation identities.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "@6aa7aabb086c5b6c02574b05495a2dcc67d6fb32cbaf5048ca728926a85e78c5"
+  assert "introduces" "language-bootstrap.schema" "language.schema"
+depends "@6aa7aabb086c5b6c02574b05495a2dcc67d6fb32cbaf5048ca728926a85e78c5"
+  replace "language-bootstrap.schema" "language.schema"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "graph-resident schema for defining object languages"
+    attr "name" "LanguageBootstrap"
+    attr "slice" "LanguageBootstrap"
+  replace "template-grammar.schema" "grammar.schema"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "graph-resident bidirectional prefix grammar schema"
+    attr "name" "TemplateGrammar"
+    attr "slice" "LanguageBootstrap"
+  replace "delta-language-bootstrap.schema" "language.change-schema"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "free change schema over LanguageBootstrap artifacts elaborating to DeltaTrellis"
+    attr "name" "DeltaLanguageBootstrap"
+    attr "slice" "LanguageBootstrap"
+  replace "language.component.language" "language.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one object-language definition"
+    attr "name" "Language"
+    attr "slice" "LanguageBootstrap"
+  replace "language.component.sort" "language.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one language sort"
+    attr "name" "Sort"
+    attr "slice" "LanguageBootstrap"
+  replace "language.component.constructor" "language.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one AST constructor with ordered typed fields"
+    attr "name" "Constructor"
+    attr "slice" "LanguageBootstrap"
+  replace "grammar.component.grammar" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one interpreted bidirectional grammar"
+    attr "name" "Grammar"
+    attr "slice" "LanguageBootstrap"
+  replace "grammar.component.production" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one production template linking a sort to a constructor"
+    attr "name" "Production"
+    attr "slice" "LanguageBootstrap"
+  replace "language.component.change-language" "language.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "free change language associated with an object language"
+    attr "name" "ChangeLanguage"
+    attr "slice" "LanguageBootstrap"
+  replace "language.component.change-operator" "language.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "domain change operator elaborating to DeltaTrellis"
+    attr "name" "ChangeOperator"
+    attr "slice" "LanguageBootstrap"
+  replace "language.bool0" "language.definition"
+    port "start" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "grammar" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "changes" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "Bool0"
+    attr "semantics" "ast-only"
+    attr "slice" "LanguageBootstrap"
+    attr "version" "0"
+  replace "language.bool0.sort.Expr" "language.sort"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Expr"
+    attr "slice" "LanguageBootstrap"
+  replace "language.bool0.ctor.True" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fields" ""
+    attr "language" "language.bool0"
+    attr "name" "True"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "language.bool0.ctor.False" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fields" ""
+    attr "language" "language.bool0"
+    attr "name" "False"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "language.bool0.ctor.Not" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fields" "value:Expr"
+    attr "language" "language.bool0"
+    attr "name" "Not"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "language.bool0.ctor.And" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fields" "left:Expr;right:Expr"
+    attr "language" "language.bool0"
+    attr "name" "And"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "language" "language.bool0"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "prefix-recursive"
+    attr "printer" "production-template"
+    attr "slice" "LanguageBootstrap"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "whitespace"
+  replace "grammar.bool0.prod.true" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "pattern" "lit:true"
+    attr "priority" "10"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "grammar.bool0.prod.false" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "pattern" "lit:false"
+    attr "priority" "20"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "grammar.bool0.prod.not" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "pattern" "lit:not;ref:value:Expr"
+    attr "priority" "30"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "grammar.bool0.prod.and" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "pattern" "lit:and;ref:left:Expr;ref:right:Expr"
+    attr "priority" "40"
+    attr "slice" "LanguageBootstrap"
+    attr "sort" "Expr"
+  replace "delta.bool0" "language.change-language"
+    port "language" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "op01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "op02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "allowed-ops" "add-node;bind-entity;replace-entity;remove-entity;connect;disconnect"
+    attr "basis" "DeltaTrellis"
+    attr "free" "true"
+    attr "language" "language.bool0"
+    attr "name" "DeltaBool0"
+    attr "slice" "LanguageBootstrap"
+    attr "validation" "language-bootstrap"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "LanguageBootstrap"
+    attr "target-kinds" "language.sort;language.constructor;grammar.definition;grammar.production;language.change-language;language.change-operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "LanguageBootstrap"
+    attr "target-kinds" "language.sort;language.constructor;grammar.production"
+  connect "language.bool0.sort.Expr" "self" "language.bool0" "start" "language.start-sort"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "delta.bool0" "self" "language.bool0" "changes" "language.change-language"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.True" "sort" "language.sort"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.False" "sort" "language.sort"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Not" "sort" "language.sort"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.And" "sort" "language.sort"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.true" "sort" "grammar.sort"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.false" "sort" "grammar.sort"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.not" "sort" "grammar.sort"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.and" "sort" "grammar.sort"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  connect "language.bool0" "self" "delta.bool0" "language" "change.language"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
