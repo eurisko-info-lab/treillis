@@ -126,7 +126,10 @@ object ManifestLanguage:
     DirectiveSpec("provides", 1, 1), DirectiveSpec("requires", 1, 1), DirectiveSpec("imports", 1, 1),
     DirectiveSpec("conflicts", 1, 1), DirectiveSpec("extends", 1, 1), DirectiveSpec("prefer", 2, 2),
     DirectiveSpec("assumes", 1, 1), DirectiveSpec("change", 1, Int.MaxValue),
-    DirectiveSpec("entity", 2, 2), DirectiveSpec("attr", 2, Int.MaxValue)
+    DirectiveSpec("entity", 2, 2), DirectiveSpec("attr", 2, Int.MaxValue),
+    DirectiveSpec("assembly", 1, 1), DirectiveSpec("foundation", 1, 1), DirectiveSpec("base", 1, 1),
+    DirectiveSpec("use", 1, 1), DirectiveSpec("omit", 1, 1), DirectiveSpec("expose", 1, 1),
+    DirectiveSpec("verify", 1, 1), DirectiveSpec("emit", 1, 1)
   )
   private val byKeyword = directives.map(spec => spec.keyword -> spec).toMap
 

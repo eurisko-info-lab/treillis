@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path}
 import scala.jdk.CollectionConverters.*
 import trellis.Core.*
 import trellis.Delta.*
-import trellis.storage.{CompositionCatalog, DeltaSource, PostActions, ProductCatalog}
+import trellis.storage.{AssemblyCatalog, AssemblyLanguage, CompositionCatalog, DeltaSource, PostActions, ProductCatalog}
 import trellis.storage.RepositoryProducts.*
 
 object Main:
@@ -64,6 +64,23 @@ object Main:
         val compiledDirectory = Path.of(args.drop(2).headOption.getOrElse(throw new IllegalArgumentException("compiled directory required")))
         compileProductSources(sourceDirectory, compiledDirectory, args.contains("--check"))
       case Some("profiles") => CompositionCatalog.registry.profiles.sortBy(_.id).foreach(profile => println(profile.id))
+      case Some("assemblies") => AssemblyCatalog.assemblies.sortBy(_.id).foreach(assembly => println(assembly.id))
+      case Some("assembly") =>
+        val assembly = AssemblyCatalog.named(args.drop(1).headOption.getOrElse(throw IllegalArgumentException("assembly name required")))
+          .fold(error => throw IllegalStateException(error), identity)
+        print(AssemblyLanguage.print(assembly).fold(error => throw IllegalStateException(error), identity))
+      case Some("compile-assembly") =>
+        val assembly = AssemblyCatalog.named(args.drop(1).headOption.getOrElse(throw IllegalArgumentException("assembly name required")))
+          .fold(error => throw IllegalStateException(error), identity)
+        val handlers: Map[String, PostActions.Handler] = Map("validate-graph" -> { graph =>
+          val errors = Check.validate(graph)
+          if errors.isEmpty then Right(()) else Left(errors.mkString("; "))
+        })
+        val compiled = CompositionCatalog.compileAssembly(assembly, Bootstrap.graph, Set(ChangeId(Bootstrap.F11ChangeId)), handlers)
+          .fold(error => throw IllegalStateException(error), identity)
+        args.drop(2).headOption match
+          case Some(path) => Files.writeString(Path.of(path), Canon.encodeGraph(compiled.graph), StandardCharsets.UTF_8)
+          case None => println(Canon.encodeGraph(compiled.graph))
       case Some("profile") =>
         val profile = args.drop(1).headOption.getOrElse(throw new IllegalArgumentException("profile name required"))
         println(CompositionCatalog.resolve(profile).fold(error => throw IllegalStateException(error), _.canonical))

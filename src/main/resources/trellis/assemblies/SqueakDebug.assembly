@@ -1,0 +1,12 @@
+assembly squeak-debug
+  foundation F11
+  base production-ide
+  use execute.sequential
+  use debug.trace
+  expose workspace.browser
+  expose workspace.transcript
+  expose workspace.inspector
+  verify embedded-tests
+  verify graph-valid
+  emit graph
+  emit selection-lock

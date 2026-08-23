@@ -2,7 +2,7 @@ package trellis
 
 import trellis.Core.*
 import trellis.Delta.*
-import trellis.storage.{Composition, CompositionCatalog, DeltaSource, ManifestLanguage, ProductCatalog}
+import trellis.storage.{AssemblyCatalog, AssemblyLanguage, Composition, CompositionCatalog, DeltaSource, ManifestLanguage, ProductCatalog}
 import trellis.storage.Composition.*
 import trellis.storage.{PostActions, SelectionApplication}
 import trellis.TestSupport.*
@@ -208,5 +208,15 @@ object CompositionTest:
       val replayed = right(SelectionApplication.materialize(Bootstrap.graph, Set(ChangeId(Bootstrap.F11ChangeId)), compiled.lock, compiled.changes, validating))
       equal(Canon.graphId(replayed.graph), Canon.graphId(compiled.graph))
       equal(replayed.applied, compiled.lock.fragments.map(_.changeId))
+    }),
+    Test("Squeak assembly syntax round-trips and selects both live and debugging engines", () => {
+      val assembly = right(AssemblyCatalog.named("squeak-debug"))
+      val printed = right(AssemblyLanguage.print(assembly))
+      equal(right(AssemblyLanguage.parse(printed)), assembly)
+      val lock = right(CompositionCatalog.resolveAssembly(assembly))
+      check(lock.providers.contains("example.fibonacci"))
+      check(lock.providers.contains("execute.parallel"))
+      check(lock.providers.contains("execute.sequential"))
+      check(lock.providers.contains("debug.trace"))
     })
   )

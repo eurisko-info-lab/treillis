@@ -25,6 +25,10 @@ object CompositionCatalog:
 
   def resolve(profile: String): Either[String, Lock] = Composition.resolve(registry, profile)
 
+  def resolveAssembly(assembly: Assembly): Either[String, Lock] =
+    Composition.resolve(registry.copy(profiles = registry.profiles :+ AssemblyLanguage.profile(assembly)), s"assembly:${assembly.id}")
+      .flatMap(lock => AssemblyLanguage.validateSelection(assembly, lock).map(_ => lock))
+
   def materialize(
       profile: String,
       basis: Graph,
@@ -44,6 +48,18 @@ object CompositionCatalog:
       handlers: Map[String, PostActions.Handler]
   ): Either[String, SelectionCompiler.Result] =
     resolve(profile).flatMap { lock =>
+      val selectedIds = lock.fragments.map(_.changeId).toSet
+      val selectedChanges = loaded.changes.view.filterKeys(selectedIds).toMap
+      SelectionCompiler.compile(basis, basisFrontier, lock, selectedChanges, handlers)
+    }
+
+  def compileAssembly(
+      assembly: Assembly,
+      basis: Graph,
+      basisFrontier: Set[ChangeId],
+      handlers: Map[String, PostActions.Handler]
+  ): Either[String, SelectionCompiler.Result] =
+    resolveAssembly(assembly).flatMap { lock =>
       val selectedIds = lock.fragments.map(_.changeId).toSet
       val selectedChanges = loaded.changes.view.filterKeys(selectedIds).toMap
       SelectionCompiler.compile(basis, basisFrontier, lock, selectedChanges, handlers)
