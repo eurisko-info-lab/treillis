@@ -1,12 +1,207 @@
 package trellis
 
 import trellis.Core.*
+import trellis.Delta.*
 import trellis.Navigate.Selection
 
 /** SVG, Typst, and code-like views are projections, never canonical source. */
 object Project:
   final case class SemanticMark(renderedId: String, selection: Selection)
   final case class Rendered(content: String, marks: Vector[SemanticMark])
+  final case class SynchronizedView(view: EntityId, rendered: Rendered, selectedIds: Vector[String])
+  final case class InteractionTarget(renderedId: String, selection: Selection, actions: Vector[String], selected: Boolean)
+  final case class InteractiveSvg(rendered: Rendered, targets: Vector[InteractionTarget])
+  final case class PreviewAnchor(entity: EntityId, page: Int, renderedId: String)
+  final case class PreviewPage(index: Int, entities: Vector[EntityId])
+  final case class TypstPreview(rendered: Rendered, pages: Vector[PreviewPage], anchors: Vector[PreviewAnchor], selectedPage: Option[Int])
+  final case class ReviewEntry(index: Int, operation: String, subject: String, before: Option[ContentId], after: Option[ContentId], selection: Option[Selection])
+  final case class DeltaReview(change: ChangeId, message: String, author: String, footprint: Vector[String], entries: Vector[ReviewEntry], successor: Graph)
+  final case class CodeAnchor(entity: EntityId, line: Int)
+  final case class CodePreview(enabled: Boolean, rendered: Option[Rendered], anchors: Vector[CodeAnchor], selectedLine: Option[Int])
+  final case class LspPosition(line: Int, character: Int)
+  final case class LspSymbol(name: String, entity: EntityId, position: LspPosition)
+  final case class LspDocument(uri: String, text: String, symbols: Vector[LspSymbol])
+
+  def lspDocument(graph: Graph): Either[String, LspDocument] =
+    for
+      _ <- lspPolicy(graph)
+      preview <- codePreview(graph)
+      rendered <- preview.rendered.toRight("LSP requires enabled Code View")
+      symbols = preview.anchors.sortBy(anchor => (anchor.line, anchor.entity.value)).map(anchor =>
+        LspSymbol(anchor.entity.value, anchor.entity, LspPosition(anchor.line - 1, 0))
+      )
+    yield LspDocument(s"trellis://graph/${Canon.graphId(graph).value}/code", rendered.content, symbols)
+
+  def lspDefinition(graph: Graph, entity: EntityId): Either[String, LspPosition] =
+    lspDocument(graph).flatMap(_.symbols.find(_.entity == entity).map(_.position).toRight(s"unknown LSP symbol ${entity.value}"))
+
+  private def lspPolicy(graph: Graph): Either[String, Unit] =
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.lsp-policy").map(entity -> _) }
+    candidates match
+      case Vector((entity, node)) =>
+        val supported = node.attrs.get("document").contains("code-view") && node.attrs.get("positions").contains("zero-based-utf16") && node.attrs.get("symbols").contains("semantic-entities") && node.attrs.get("definition").contains("exact-anchor") && node.attrs.get("failure").contains("strict")
+        Either.cond(supported, (), s"unsupported LSP policy ${entity.value}")
+      case Vector() => Left("missing Studio LSP policy")
+      case _ => Left("multiple Studio LSP policies")
+
+  def codePreview(graph: Graph, selection: Option[Selection] = None): Either[String, CodePreview] =
+    for
+      policy <- codeViewPolicy(graph)
+      preview <-
+        if !policy._1 then Right(CodePreview(false, None, Vector.empty, None))
+        else
+          for
+            spec <- ProjectionRules.view(graph, EntityId("projection.code"))
+            rendered <- renderView(graph, EntityId("projection.code"), selection)
+            ordered = filteredNodes(graph, spec)
+            anchors = ordered.zipWithIndex.flatMap { case ((_, _, names), index) => names.map(name => CodeAnchor(EntityId(name), index + 1)) }
+            selectedIds <- selection match
+              case None => Right(Vector.empty[String])
+              case Some(value) => synchronizeSelection(graph, value).map(_.find(_.view == EntityId("projection.code")).toVector.flatMap(_.selectedIds))
+            selectedLine = anchors.find(anchor => selectedIds.contains(anchor.entity.value)).map(_.line)
+            _ <- if selection.nonEmpty && policy._2 == "reveal" && selectedLine.isEmpty then Left("selected semantic item has no Code View line") else Right(())
+          yield CodePreview(true, Some(rendered), anchors, selectedLine)
+    yield preview
+
+  private def codeViewPolicy(graph: Graph): Either[String, (Boolean, String)] =
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.code-view-policy").map(entity -> _) }
+    candidates match
+      case Vector((entity, node)) =>
+        for
+          enabled <- node.attrs.get("enabled").flatMap(_.toBooleanOption).toRight(s"${entity.value} lacks boolean enabled")
+          lines <- node.attrs.get("lines").toRight(s"${entity.value} lacks lines")
+          selection <- node.attrs.get("selection").toRight(s"${entity.value} lacks selection")
+          failure <- node.attrs.get("failure").toRight(s"${entity.value} lacks failure")
+          _ <- if lines == "one-based-semantic" && selection == "reveal" && failure == "strict" then Right(()) else Left(s"unsupported Code View policy ${entity.value}")
+        yield enabled -> selection
+      case Vector() => Left("missing Studio Code View policy")
+      case _ => Left("multiple Studio Code View policies")
+
+  def reviewDelta(graph: Graph, change: Change): Either[String, DeltaReview] =
+    for
+      _ <- reviewPolicy(graph)
+      successor <- Delta.applyChange(graph, change)
+      entries <- sequence(change.operations.zipWithIndex.map { case (operation, index) => reviewEntry(graph, successor, operation, index) })
+    yield DeltaReview(Change.id(change), change.message, change.author, Delta.footprint(change).toVector.sorted, entries, successor)
+
+  private def reviewPolicy(graph: Graph): Either[String, Unit] =
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.delta-review-policy").map(entity -> _) }
+    candidates match
+      case Vector((entity, node)) =>
+        val supported = node.attrs.get("order").contains("operation-order") && node.attrs.get("snapshots").contains("content-id") && node.attrs.get("impacts").contains("semantic-selection") && node.attrs.get("failure").contains("strict")
+        Either.cond(supported, (), s"unsupported delta review policy ${entity.value}")
+      case Vector() => Left("missing Studio delta review policy")
+      case _ => Left("multiple Studio delta review policies")
+
+  private def reviewEntry(beforeGraph: Graph, afterGraph: Graph, operation: Op, index: Int): Either[String, ReviewEntry] = operation match
+    case Op.AddNode(node) =>
+      val id = Canon.nodeId(node)
+      Right(ReviewEntry(index, "add-node", id.value, None, Some(id), Some(Selection.Node(id))))
+    case Op.BindEntity(entity, node) =>
+      Right(ReviewEntry(index, "bind-entity", entity.value, beforeGraph.entities.get(entity), Some(node), Some(Selection.Entity(entity))))
+    case Op.ReplaceEntity(entity, node) =>
+      val after = Canon.nodeId(node)
+      beforeGraph.entities.get(entity).toRight(s"review replacement names unknown entity ${entity.value}").map(old => ReviewEntry(index, "replace-entity", entity.value, Some(old), Some(after), Some(Selection.Entity(entity))))
+    case Op.RemoveEntity(entity) =>
+      beforeGraph.entities.get(entity).toRight(s"review removal names unknown entity ${entity.value}").map(old => ReviewEntry(index, "remove-entity", entity.value, Some(old), None, Some(Selection.Entity(entity))))
+    case Op.Connect(edge) =>
+      val id = Canon.edgeId(edge)
+      Right(ReviewEntry(index, "connect", id.value, None, Some(id), Some(Selection.Edge(id))))
+    case Op.Disconnect(edge) =>
+      Either.cond(beforeGraph.edges.contains(edge), ReviewEntry(index, "disconnect", edge.value, Some(edge), None, Some(Selection.Edge(edge))), s"review disconnect names unknown edge ${edge.value}")
+    case Op.AddRoot(name, node) => Right(ReviewEntry(index, "add-root", name, beforeGraph.roots.get(name), Some(node), None))
+    case Op.RemoveRoot(name) => beforeGraph.roots.get(name).toRight(s"review removal names unknown root $name").map(old => ReviewEntry(index, "remove-root", name, Some(old), None, None))
+    case Op.RefineHole(entity, node) =>
+      val after = Canon.nodeId(node)
+      beforeGraph.entities.get(entity).toRight(s"review refinement names unknown entity ${entity.value}").map(old => ReviewEntry(index, "refine-hole", entity.value, Some(old), Some(after), Some(Selection.Entity(entity))))
+
+  def typstPreview(graph: Graph, selection: Option[Selection] = None): Either[String, TypstPreview] =
+    for
+      policy <- previewPolicy(graph)
+      rendered <- renderView(graph, EntityId("projection.typst"), selection)
+      entities = rendered.marks.collect { case SemanticMark(renderedId, Selection.Entity(entity)) => entity -> renderedId }
+      pages = entities.grouped(policy._1).zipWithIndex.map { case (items, index) => PreviewPage(index + 1, items.map(_._1)) }.toVector
+      anchors = pages.flatMap(page => page.entities.map(entity => PreviewAnchor(entity, page.index, entity.value)))
+      selectedIds <- selection match
+        case None => Right(Vector.empty[String])
+        case Some(value) => synchronizeSelection(graph, value).map(_.find(_.view == EntityId("projection.typst")).toVector.flatMap(_.selectedIds))
+      selectedPage = anchors.find(anchor => selectedIds.contains(anchor.renderedId)).map(_.page)
+      _ <- if selection.nonEmpty && policy._2 == "reveal" && selectedPage.isEmpty then Left("selected semantic item has no Typst preview page") else Right(())
+    yield TypstPreview(rendered, pages, anchors, selectedPage)
+
+  private def previewPolicy(graph: Graph): Either[String, (Int, String)] =
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.typst-preview-policy").map(entity -> _) }
+    candidates match
+      case Vector((entity, node)) =>
+        for
+          pageSize <- node.attrs.get("entities-per-page").flatMap(_.toIntOption).toRight(s"${entity.value} lacks integer entities-per-page")
+          numbering <- node.attrs.get("numbering").toRight(s"${entity.value} lacks numbering")
+          selection <- node.attrs.get("selection").toRight(s"${entity.value} lacks selection")
+          failure <- node.attrs.get("failure").toRight(s"${entity.value} lacks failure")
+          _ <- if pageSize > 0 && pageSize <= 256 && numbering == "one-based" && selection == "reveal" && failure == "strict" then Right(()) else Left(s"unsupported Typst preview policy ${entity.value}")
+        yield pageSize -> selection
+      case Vector() => Left("missing Studio Typst preview policy")
+      case _ => Left("multiple Studio Typst preview policies")
+
+  def interactiveSvg(graph: Graph, selection: Selection, view: EntityId = EntityId("projection.svg")): Either[String, InteractiveSvg] =
+    for
+      policy <- interactionPolicy(graph)
+      synchronized <- synchronizeSelection(graph, selection)
+      selected = synchronized.find(_.view == view).map(_.selectedIds.toSet).getOrElse(Set.empty)
+      rendered <- renderView(graph, view, Some(selection))
+      targets = rendered.marks.sortBy(_.renderedId).map(mark => InteractionTarget(mark.renderedId, mark.selection, policy, selected.contains(mark.renderedId)))
+      _ <- if targets.nonEmpty then Right(()) else Left(s"interactive SVG view ${view.value} has no semantic targets")
+    yield InteractiveSvg(rendered, targets)
+
+  private def interactionPolicy(graph: Graph): Either[String, Vector[String]] =
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.svg-interaction-policy").map(entity -> _) }
+    candidates match
+      case Vector((entity, node)) =>
+        for
+          actions <- node.attrs.get("actions").toRight(s"${entity.value} lacks actions")
+          focus <- node.attrs.get("focus").toRight(s"${entity.value} lacks focus")
+          selected <- node.attrs.get("selected-state").toRight(s"${entity.value} lacks selected-state")
+          failure <- node.attrs.get("failure").toRight(s"${entity.value} lacks failure")
+          decoded = actions.split(";", -1).toVector.filter(_.nonEmpty)
+          _ <- if decoded == Vector("select", "activate") && focus == "semantic-targets" && selected == "aria-selected" && failure == "strict" then Right(()) else Left(s"unsupported SVG interaction policy ${entity.value}")
+        yield decoded
+      case Vector() => Left("missing Studio SVG interaction policy")
+      case _ => Left("multiple Studio SVG interaction policies")
+
+  def synchronizeSelection(graph: Graph, selection: Selection): Either[String, Vector[SynchronizedView]] =
+    for
+      policy <- selectionPolicy(graph)
+      keys <- equivalentSelectionKeys(graph, selection)
+      views <- sequence(policy._1.map { view =>
+        renderView(graph, view, None).map { rendered =>
+          val selected = rendered.marks.filter(mark => keys.contains(Navigate.selectionKey(mark.selection))).map(_.renderedId).distinct.sorted
+          SynchronizedView(view, rendered, selected)
+        }
+      })
+      _ <- if policy._2 == "require-visible" && views.exists(_.selectedIds.isEmpty) then Left("semantic selection is not visible in every synchronized view") else Right(())
+    yield views
+
+  private def selectionPolicy(graph: Graph): Either[String, (Vector[EntityId], String)] =
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.selection-policy").map(entity -> _) }
+    candidates match
+      case Vector((entity, node)) =>
+        for
+          views <- node.attrs.get("views").toRight(s"${entity.value} lacks views")
+          visibility <- node.attrs.get("visibility").toRight(s"${entity.value} lacks visibility")
+          identity <- node.attrs.get("identity").toRight(s"${entity.value} lacks identity")
+          failure <- node.attrs.get("failure").toRight(s"${entity.value} lacks failure")
+          decoded = views.split(";", -1).toVector.filter(_.nonEmpty).map(EntityId.apply)
+          _ <- if decoded.nonEmpty && identity == "entity-node-equivalence" && Set("allow-hidden", "require-visible").contains(visibility) && failure == "strict" then Right(()) else Left(s"unsupported selection policy ${entity.value}")
+          _ <- sequence(decoded.map(view => ProjectionRules.view(graph, view).map(_ => ()))).map(_ => ())
+        yield decoded -> visibility
+      case Vector() => Left("missing Studio selection policy")
+      case _ => Left("multiple Studio selection policies")
+
+  private def equivalentSelectionKeys(graph: Graph, selection: Selection): Either[String, Set[String]] = selection match
+    case Selection.Entity(entity) => graph.entities.get(entity).toRight(s"unknown entity ${entity.value}").map(node => Set(Navigate.selectionKey(selection), Navigate.selectionKey(Selection.Node(node))))
+    case Selection.Node(node) => graph.nodes.get(node).toRight(s"unknown node ${node.value}").map(_ => Set(Navigate.selectionKey(selection)) ++ graph.entities.collect { case (entity, `node`) => Navigate.selectionKey(Selection.Entity(entity)) })
+    case Selection.Edge(edge) => Either.cond(graph.edges.contains(edge), Set(Navigate.selectionKey(selection)), s"unknown edge ${edge.value}")
+    case other => Left(s"unsupported synchronized selection ${Navigate.selectionKey(other)}")
 
   final case class ViewSpec(entity: EntityId, format: String, attrs: Map[String, String]):
     def text(name: String, default: String): String = attrs.getOrElse(name, default)
@@ -92,17 +287,19 @@ object Project:
 
   /** Render any graph-defined F5 view. */
   def renderView(graph: Graph, view: EntityId, selection: Option[Selection] = None): Either[String, Rendered] =
-    selection.foreach(_ => ()) // reserved for selection-scoped rendering; marks are already semantic
     ProjectionRules.view(graph, view).flatMap { spec =>
       spec.format match
         case "code" =>
           requirePrimitive(graph, view, "node", "code-node").map(_ => renderCode(graph, spec))
         case "svg" =>
-          requirePrimitive(graph, view, "node", "svg-node").map(_ => renderSvg(graph, spec))
+          requirePrimitive(graph, view, "node", "svg-node").flatMap(_ => renderSvg(graph, spec, selection))
         case "typst" =>
           requirePrimitive(graph, view, "entity", "typst-entity").map(_ => renderTypst(graph, spec))
         case other => Left(s"unsupported projection format $other for ${view.value}")
     }
+
+  private def sequence[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
+    values.foldLeft[Either[String, Vector[A]]](Right(Vector.empty))((acc, value) => acc.flatMap(items => value.map(items :+ _)))
 
   private def requirePrimitive(graph: Graph, view: EntityId, subject: String, primitive: String): Either[String, Unit] =
     if ProjectionRules.hasPrimitive(graph, view, subject, primitive) then Right(())
@@ -124,7 +321,9 @@ object Project:
     }
     Rendered(rows.mkString("\n"), marks)
 
-  private def renderSvg(graph: Graph, spec: ViewSpec): Rendered =
+  private def renderSvg(graph: Graph, spec: ViewSpec, selection: Option[Selection]): Either[String, Rendered] =
+    val selectedKeys = selection.map(equivalentSelectionKeys(graph, _)).getOrElse(Right(Set.empty))
+    selectedKeys.map { keys =>
     val ordered = filteredNodes(graph, spec)
     val included = ordered.map(_._1).toSet
     val x = spec.int("x", 40)
@@ -142,12 +341,17 @@ object Project:
       for
         (x1, y1) <- pos.get(edge.from.node)
         (x2, y2) <- pos.get(edge.to.node)
-      yield s"<path id=\"edge-${edgeId.value}\" data-trellis-edge=\"${edgeId.value}\" d=\"M ${x1 + nodeWidth} ${y1 + nodeHeight / 2} L $x2 ${y2 + nodeHeight / 2}\" stroke=\"currentColor\" fill=\"none\"/>"
+      yield
+        val selected = keys.contains(Navigate.selectionKey(Selection.Edge(edgeId)))
+        val interaction = if selection.nonEmpty then s" tabindex=\"0\" role=\"button\" aria-selected=\"$selected\"" else ""
+        s"<path id=\"edge-${edgeId.value}\" data-trellis-edge=\"${edgeId.value}\"$interaction d=\"M ${x1 + nodeWidth} ${y1 + nodeHeight / 2} L $x2 ${y2 + nodeHeight / 2}\" stroke=\"currentColor\" fill=\"none\"/>"
     }
     val nodes = ordered.map { case (id, node, names) =>
       val (nx, ny) = pos(id)
       val label = xmlEscape(names.headOption.getOrElse(node.kind))
-      s"""<g id="node-${id.value}" data-trellis-node="${id.value}" data-kind="${xmlEscape(node.kind)}">
+      val selected = keys.contains(Navigate.selectionKey(Selection.Node(id)))
+      val interaction = if selection.nonEmpty then s" tabindex=\"0\" role=\"button\" aria-selected=\"$selected\"" else ""
+      s"""<g id="node-${id.value}" data-trellis-node="${id.value}" data-kind="${xmlEscape(node.kind)}"$interaction>
          |  <rect x="$nx" y="$ny" width="$nodeWidth" height="$nodeHeight" rx="8" fill="none" stroke="currentColor"/>
          |  <text x="${nx + 12}" y="${ny + 30}" font-family="monospace" font-size="14">$label</text>
          |</g>""".stripMargin
@@ -160,6 +364,7 @@ object Project:
     val marks = ordered.map { case (id, _, _) => SemanticMark("node-" + id.value, Selection.Node(id)) } ++
       visibleEdges.map { case (id, _) => SemanticMark("edge-" + id.value, Selection.Edge(id)) }
     Rendered(svg, marks)
+    }
 
   private def renderTypst(graph: Graph, spec: ViewSpec): Rendered =
     val included = filteredNodes(graph, spec).map(_._1).toSet

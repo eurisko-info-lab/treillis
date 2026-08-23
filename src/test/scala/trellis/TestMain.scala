@@ -1,15 +1,28 @@
 package trellis
 
+import trellis.TestSupport.Test
+import trellis.storage.{DeltaSourceTests, ProductCatalog}
+
 object TestMain:
   def main(args: Array[String]): Unit =
-    val suites = Vector(
+    val coreSuites = Vector(
       "Canon" -> CanonTest.tests,
       "Foundation" -> FoundationTest.tests,
-      "Repo" -> RepoTest.tests,
+      "RepositoryProducts" -> RepositoryProductsTest.tests,
+      "Composition" -> CompositionTest.tests,
       "Check" -> CheckTest.tests,
       "Machine" -> MachineTest.tests,
-      "Projection" -> ProjectionTest.tests
+      "Projection" -> ProjectionTest.tests,
+      "Architecture" -> ArchitectureTest.tests,
+      "TrellisLanguage" -> TrellisLanguageTest.tests,
+      "ExecutionEngine" -> ExecutionEngineTest.tests
     )
+    val deltaSuites = ProductCatalog.products.map { product =>
+      product.name -> DeltaSourceTests.run(product).map { result =>
+        Test(result.name, () => result.error.foreach(error => throw AssertionError(error)))
+      }
+    }
+    val suites = coreSuites ++ deltaSuites
     var failed = 0
     suites.foreach { case (suite, tests) =>
       tests.foreach { test =>

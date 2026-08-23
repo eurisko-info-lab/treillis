@@ -3,10 +3,10 @@ package trellis
 import java.util.Arrays
 import trellis.Core.*
 import trellis.Delta.*
-import trellis.Repo.*
+import trellis.storage.RepositoryProducts.*
 import trellis.TestSupport.*
 
-object RepoTest:
+object RepositoryProductsTest:
   private def right[A](value: Either[String, A]): A = value.fold(err => throw new AssertionError(err), identity)
 
   val tests = Vector(

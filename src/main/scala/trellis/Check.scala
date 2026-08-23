@@ -491,6 +491,15 @@ object Check:
           scoreTerm(term, model, definitions)
         }
 
+    def scoreWithWeights(graph: Graph, term: EqualityTerm, weights: Map[String, Int]): Either[String, Long] =
+      val unknown = weights.keySet -- dimensions.toSet
+      val missing = dimensions.toSet -- weights.keySet
+      if unknown.nonEmpty || missing.nonEmpty || weights.values.exists(_ < 0) then Left("target cost weights must define every non-negative equality dimension exactly")
+      else
+        val problems = definitionErrors(graph)
+        if problems.nonEmpty then Left(problems.mkString("; "))
+        else Right(scoreTerm(term, EqualityCostModel(weights), operators(graph).map(op => op.operator -> op).toMap))
+
     def extract(graph: Graph, eclass: EClass): Either[String, EqualityTerm] =
       if eclass.terms.isEmpty then Left("cannot extract from an empty equality class")
       else
@@ -596,6 +605,131 @@ object Check:
       case Some(raw) => raw.toIntOption.filter(_ >= 0).toRight(s"$label must be a non-negative integer, found $raw")
       case None => Left(s"missing $label")
 
+  final case class OptimizationDerivation(seed: EntityId, eclass: EClass, admittedRules: Vector[EntityId], requiredInvariants: Vector[String])
+  final case class VerifiedLaw(entity: EntityId, rule: EntityId, lhs: String, rhs: String, mode: String, preserves: Vector[String])
+  final case class TargetExtraction(target: EntityId, derivation: OptimizationDerivation, selected: EqualityTerm, scores: Vector[(EqualityTerm, Long)])
+  final case class OptimizedLowering(target: EntityId, selected: EqualityTerm, rule: EntityId, agent: EntityId, preserves: Vector[String], evidence: EntityId)
+
+  object Optimization:
+    def lowerForTarget(graph: Graph, seed: EntityId, target: EntityId): Either[String, OptimizedLowering] =
+      for
+        _ <- loweringPolicy(graph)
+        extraction <- extractForTarget(graph, seed, target)
+        laws <- verifiedLaws(graph)
+        candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) =>
+          graph.nodes.get(id).filter(node => node.kind == "optimization.deltanet-lowering" && node.attrs.get("operator").contains(extraction.selected.operator)).map(entity -> _)
+        }
+        selected <- candidates match
+          case Vector(one) => Right(one)
+          case Vector() => Left(s"no optimized DeltaNet lowering for ${extraction.selected.operator}")
+          case _ => Left(s"ambiguous optimized DeltaNet lowering for ${extraction.selected.operator}")
+        (ruleEntity, node) = selected
+        agent <- node.attrs.get("agent").map(EntityId.apply).toRight(s"${ruleEntity.value} lacks agent")
+        _ <- graph.entity(agent).filter(_.kind == "deltanet.agent-kind").toRight(s"${ruleEntity.value} names invalid agent ${agent.value}")
+        preserves <- node.attrs.get("preserves").toRight(s"${ruleEntity.value} lacks preserves").map(_.split(";", -1).toVector.filter(_.nonEmpty).sorted)
+        _ <- if extraction.derivation.requiredInvariants.forall(preserves.contains) then Right(()) else Left(s"${ruleEntity.value} does not preserve required invariants")
+        evidence <- node.attrs.get("evidence").map(EntityId.apply).toRight(s"${ruleEntity.value} lacks evidence")
+        law <- laws.find(_.entity == evidence).toRight(s"${ruleEntity.value} names unverified evidence ${evidence.value}")
+        _ <- if law.lhs == extraction.selected.operator || law.rhs == extraction.selected.operator then Right(()) else Left(s"${ruleEntity.value} evidence does not cover ${extraction.selected.operator}")
+      yield OptimizedLowering(target, extraction.selected, ruleEntity, agent, preserves, evidence)
+
+    private def loweringPolicy(graph: Graph): Either[String, Unit] =
+      val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "optimization.lowering-policy").map(entity -> _) }
+      candidates match
+        case Vector((entity, node)) =>
+          val supported = node.attrs.get("selection").contains("exact-operator") && node.attrs.get("invariants").contains("required-subset") && node.attrs.get("evidence").contains("verified-law") && node.attrs.get("failure").contains("strict")
+          Either.cond(supported, (), s"unsupported optimization lowering policy ${entity.value}")
+        case Vector() => Left("missing optimization lowering policy")
+        case _ => Left("multiple optimization lowering policies")
+
+    def extractForTarget(graph: Graph, seed: EntityId, target: EntityId): Either[String, TargetExtraction] =
+      for
+        _ <- targetPolicy(graph)
+        targetNode <- graph.entity(target).toRight(s"unknown optimization target ${target.value}")
+        _ <- if targetNode.kind == "optimization.target" then Right(()) else Left(s"${target.value} is ${targetNode.kind}, not optimization.target")
+        weights <- sequence(EqualityRules.dimensions.map { dimension =>
+          targetNode.attrs.get(dimension).flatMap(_.toIntOption).filter(_ >= 0).toRight(s"${target.value} lacks non-negative $dimension weight").map(dimension -> _)
+        }).map(_.toMap)
+        derivation <- derive(graph, seed)
+        scored <- sequence(derivation.eclass.terms.toVector.map(term => EqualityRules.scoreWithWeights(graph, term, weights).map(score => term -> score)))
+        ordered = scored.sortBy { case (term, score) => (score, term.operator, Canon.encodeMode(term.mode)) }
+        selected <- ordered.headOption.map(_._1).toRight("cannot extract from empty optimization derivation")
+      yield TargetExtraction(target, derivation, selected, ordered)
+
+    private def targetPolicy(graph: Graph): Either[String, Unit] =
+      val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "optimization.target-policy").map(entity -> _) }
+      candidates match
+        case Vector((entity, node)) =>
+          val supported = node.attrs.get("dimensions").contains("exact") && node.attrs.get("selection").contains("minimum-score-then-term") && node.attrs.get("failure").contains("strict")
+          Either.cond(supported, (), s"unsupported optimization target policy ${entity.value}")
+        case Vector() => Left("missing optimization target policy")
+        case _ => Left("multiple optimization target policies")
+
+    def verifiedLaws(graph: Graph): Either[String, Vector[VerifiedLaw]] =
+      for
+        _ <- lawPolicy(graph)
+        laws <- sequence(graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) =>
+          graph.nodes.get(id).filter(_.kind == "optimization.law").map(node => verifyLaw(graph, entity, node))
+        })
+        _ <- laws.groupBy(_.rule).collectFirst { case (rule, duplicates) if duplicates.size > 1 => rule } match
+          case Some(rule) => Left(s"multiple optimization laws for ${rule.value}")
+          case None => Right(())
+      yield laws
+
+    def derive(graph: Graph, seedEntity: EntityId): Either[String, OptimizationDerivation] =
+      for
+        _ <- policy(graph)
+        lawGated = graph.entities.valuesIterator.exists(id => graph.nodes.get(id).exists(_.kind == "optimization.law-policy"))
+        laws <- if lawGated then verifiedLaws(graph) else Right(Vector.empty)
+        seedNode <- graph.entity(seedEntity).toRight(s"unknown optimization seed ${seedEntity.value}")
+        _ <- if seedNode.kind == "optimization.seed" then Right(()) else Left(s"${seedEntity.value} is ${seedNode.kind}, not optimization.seed")
+        operator <- seedNode.attrs.get("operator").filter(_.nonEmpty).toRight(s"${seedEntity.value} lacks operator")
+        mode <- seedNode.attrs.get("mode") match
+          case Some("unrestricted") => Right(Mode.Unrestricted)
+          case Some("affine") => Right(Mode.Affine)
+          case Some("linear") => Right(Mode.Linear)
+          case Some(other) => Left(s"${seedEntity.value} has invalid mode $other")
+          case None => Left(s"${seedEntity.value} lacks mode")
+        equalityPolicy <- EqualityRules.policy(graph)
+        eclass <- EqualityRules.saturate(graph, EqualityTerm(operator, mode))
+        admitted <- sequence(EqualityRules.rules(graph).map(rule => EqualityRules.admitted(graph, rule, mode).map(ok => rule -> ok)))
+        operators = eclass.terms.map(_.operator)
+        verifiedRules = if lawGated then laws.map(_.rule).toSet else EqualityRules.rules(graph).map(_.entity).toSet
+        used = admitted.collect { case (rule, true) if verifiedRules.contains(rule.entity) && (operators.contains(rule.lhs) || operators.contains(rule.rhs)) => rule.entity }.distinct.sortBy(_.value)
+      yield OptimizationDerivation(seedEntity, eclass, used, equalityPolicy.requiredPreserve.toVector.sorted)
+
+    private def lawPolicy(graph: Graph): Either[String, Unit] =
+      val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "optimization.law-policy").map(entity -> _) }
+      candidates match
+        case Vector((entity, node)) =>
+          val supported = node.attrs.get("binding").contains("exact-rule") && node.attrs.get("invariants").contains("exact") && node.attrs.get("mode").contains("exact") && node.attrs.get("failure").contains("strict")
+          Either.cond(supported, (), s"unsupported optimization law policy ${entity.value}")
+        case Vector() => Left("missing optimization law policy")
+        case _ => Left("multiple optimization law policies")
+
+    private def verifyLaw(graph: Graph, entity: EntityId, node: Node): Either[String, VerifiedLaw] =
+      for
+        ruleEntity <- node.attrs.get("rule").map(EntityId.apply).toRight(s"${entity.value} lacks rule")
+        rule <- EqualityRules.rules(graph).find(_.entity == ruleEntity).toRight(s"${entity.value} names unknown rewrite ${ruleEntity.value}")
+        lhs <- node.attrs.get("lhs").toRight(s"${entity.value} lacks lhs")
+        rhs <- node.attrs.get("rhs").toRight(s"${entity.value} lacks rhs")
+        mode <- node.attrs.get("mode").toRight(s"${entity.value} lacks mode")
+        preserves <- node.attrs.get("preserves").toRight(s"${entity.value} lacks preserves").map(_.split(";", -1).toVector.filter(_.nonEmpty).sorted)
+        expectedMode = rule.mode.map(Canon.encodeMode).getOrElse("any")
+        _ <- if lhs == rule.lhs && rhs == rule.rhs && mode == expectedMode && preserves == rule.preserves.toVector.sorted then Right(()) else Left(s"${entity.value} does not exactly prove ${rule.entity.value}")
+      yield VerifiedLaw(entity, ruleEntity, lhs, rhs, mode, preserves)
+
+    private def policy(graph: Graph): Either[String, Unit] =
+      val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "optimization.derivation-policy").map(entity -> _) }
+      candidates match
+        case Vector((entity, node)) =>
+          val supported = node.attrs.get("engine").contains("foundation-egraph") && node.attrs.get("resources").contains("mode-and-invariants") && node.attrs.get("saturation").contains("bounded") && node.attrs.get("failure").contains("strict")
+          Either.cond(supported, (), s"unsupported optimization derivation policy ${entity.value}")
+        case Vector() => Left("missing optimization derivation policy")
+        case _ => Left("multiple optimization derivation policies")
+
+    private def sequence[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
+      values.foldLeft[Either[String, Vector[A]]](Right(Vector.empty))((acc, value) => acc.flatMap(items => value.map(items :+ _)))
 
   final case class DeltaNetPolicy(
       requiredPreserve: Set[String],

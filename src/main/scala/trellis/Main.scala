@@ -2,9 +2,11 @@ package trellis
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
+import scala.jdk.CollectionConverters.*
 import trellis.Core.*
 import trellis.Delta.*
-import trellis.Repo.*
+import trellis.storage.{CompositionCatalog, DeltaSource, PostActions, ProductCatalog}
+import trellis.storage.RepositoryProducts.*
 
 object Main:
   def main(args: Array[String]): Unit =
@@ -49,12 +51,66 @@ object Main:
       case Some("closure") =>
         val report = Bootstrap.cleanRoomReproduce().fold(err => throw new IllegalStateException(err), identity)
         println(Bootstrap.encodeClosureReport(report))
+      case Some("products") =>
+        ProductCatalog.products.foreach(product => println(s"${product.name} ${product.changeId.value} ${product.root.value}"))
+      case Some("product") =>
+        val product = ProductCatalog.named(args.drop(1).headOption.getOrElse(throw new IllegalArgumentException("product name required")))
+        println(Delta.encodeChange(product.change))
+      case Some("product-source") =>
+        val product = ProductCatalog.named(args.drop(1).headOption.getOrElse(throw new IllegalArgumentException("product name required")))
+        print(product.source)
+      case Some("compile-product-sources") =>
+        val sourceDirectory = Path.of(args.drop(1).headOption.getOrElse(throw new IllegalArgumentException("source directory required")))
+        val compiledDirectory = Path.of(args.drop(2).headOption.getOrElse(throw new IllegalArgumentException("compiled directory required")))
+        compileProductSources(sourceDirectory, compiledDirectory, args.contains("--check"))
+      case Some("profiles") => CompositionCatalog.registry.profiles.sortBy(_.id).foreach(profile => println(profile.id))
+      case Some("profile") =>
+        val profile = args.drop(1).headOption.getOrElse(throw new IllegalArgumentException("profile name required"))
+        println(CompositionCatalog.resolve(profile).fold(error => throw IllegalStateException(error), _.canonical))
+      case Some("compile-profile") =>
+        val profile = args.drop(1).headOption.getOrElse(throw new IllegalArgumentException("profile name required"))
+        val handlers: Map[String, PostActions.Handler] = Map("validate-graph" -> { graph =>
+          val errors = Check.validate(graph)
+          if errors.isEmpty then Right(()) else Left(errors.mkString("; "))
+        })
+        val compiled = CompositionCatalog.compile(profile, Bootstrap.graph, Set(ChangeId(Bootstrap.F11ChangeId)), handlers).fold(error => throw IllegalStateException(error), identity)
+        println(compiled.canonicalProvenance)
+        println(s"graph-root ${Canon.graphId(compiled.graph).value}")
       case Some("svg") => writeOrPrint(args.drop(1).headOption, Project.Svg.render(Bootstrap.graph).content)
       case Some("typst") => writeOrPrint(args.drop(1).headOption, Project.Typst.render(Bootstrap.graph).content)
       case Some("svg-ownership") => writeOrPrint(args.drop(1).headOption, Project.OwnershipSvg.render(Bootstrap.graph).content)
       case Some("svg-process") => writeOrPrint(args.drop(1).headOption, Project.ProcessSvg.render(Bootstrap.graph).content)
       case Some("svg-machine") => writeOrPrint(args.drop(1).headOption, Project.MachineSvg.render(Bootstrap.graph).content)
       case _ => demo()
+
+  private def compileProductSources(sourceDirectory: Path, compiledDirectory: Path, checkOnly: Boolean): Unit =
+    val stream = Files.walk(sourceDirectory)
+    val sources = try stream.iterator.asScala.filter(_.getFileName.toString.endsWith(".delta")).toVector.map { path =>
+      val name = path.getFileName.toString.stripSuffix(".delta")
+      val source = Files.readString(path, StandardCharsets.UTF_8)
+      name -> DeltaSource.parse(source).fold(error => throw IllegalStateException(s"$name: $error"), identity)
+    }.toMap finally stream.close()
+    val remaining = scala.collection.mutable.Map.from(sources)
+    var basis = Bootstrap.graph
+    var predecessorName = s"@${Bootstrap.F11ChangeId}"
+    var dependencyIds = Map(predecessorName -> ChangeId(Bootstrap.F11ChangeId))
+    Files.createDirectories(compiledDirectory)
+    while remaining.nonEmpty do
+      val candidates = remaining.toVector.collect { case (name, document) if document.dependencies == Vector(predecessorName) => name -> document }
+      if candidates.size != 1 then throw IllegalStateException(s"source chain after $predecessorName has ${candidates.size} successors")
+      val (name, document) = candidates.head
+      if document.name != name then throw IllegalStateException(s"$name source declares ${document.name}")
+      val (change, graph) = DeltaSource.compile(document, basis, dependencyIds).fold(error => throw IllegalStateException(s"$name: $error"), identity)
+      val bytes = Delta.encodeChangeBytes(change)
+      val target = compiledDirectory.resolve(s"$name.tdc")
+      if checkOnly then
+        if !Files.exists(target) || !java.util.Arrays.equals(Files.readAllBytes(target), bytes) then throw IllegalStateException(s"$target is stale")
+      else Files.write(target, bytes)
+      val id = Change.id(change)
+      basis = graph
+      predecessorName = name
+      dependencyIds += name -> id
+      remaining -= name
 
   private def demo(): Unit =
     val base = Bootstrap.graph
@@ -122,6 +178,7 @@ object Main:
       println(s"upstream basis:  ${p.packageName}/${p.branch} @ ${p.basisRoot.value.take(12)}")
     }
     println("\nCode View:\n" + Project.CodeView.render(materialized.graph).content.linesIterator.take(12).mkString("\n"))
+
 
   private def writeOrPrint(path: Option[String], content: String): Unit = path match
     case None => println(content)

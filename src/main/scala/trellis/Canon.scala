@@ -224,7 +224,7 @@ object Canon:
       _ <- nonEmpty(parts(1), "port reference name")
     yield PortRef(ContentId(parts(0)), parts(1))
 
-  private def decodeTy(encoded: String): Either[String, Ty] =
+  def decodeTy(encoded: String): Either[String, Ty] =
     tagAndFields(encoded).flatMap {
       case ("atom", Vector(name)) => nonEmpty(name, "atom type name").map(_ => Ty.Atom(name))
       case ("tuple", items) => sequenceEither(items.map(decodeTy)).map(items => Ty.Tuple(items))

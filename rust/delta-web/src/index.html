@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trellis Studio</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161922; --panel2: #1c202b; --border: #2a2f3d;
+    --text: #e4e7ee; --muted: #8b93a7; --accent: #5aa9ff; --ok: #4caf6f; --bad: #e0616f;
+    --edge: #444b5c; --edge-hi: #5aa9ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+    background: var(--panel); border-bottom: 1px solid var(--border); flex: none;
+  }
+  header h1 { font-size: 14px; font-weight: 600; margin: 0; white-space: nowrap; }
+  header .path { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
+  header .spacer { flex: 1; }
+  header button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+  }
+  header button:hover { border-color: var(--accent); }
+  header button.active { border-color: var(--accent); color: var(--accent); }
+  #status { color: var(--muted); font-size: 12px; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #sidebar {
+    width: 250px; flex: none; background: var(--panel); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 6px 0;
+  }
+  .warn-box {
+    margin: 6px 8px; padding: 6px 8px; background: #3a2a1a; border: 1px solid #6b4b1f;
+    border-radius: 5px; font-size: 11px; color: #e8c07d;
+  }
+  .warn-box .t { font-weight: 600; margin-bottom: 3px; }
+  .layer-item {
+    display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer;
+    border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .layer-item:hover { background: var(--panel2); }
+  .layer-item.selected { background: var(--panel2); border-left-color: var(--accent); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .dot.ok { background: var(--ok); }
+  .dot.bad { background: var(--bad); }
+  .layer-item .name { overflow: hidden; text-overflow: ellipsis; }
+  .layer-item .idx { color: var(--muted); font-size: 10px; width: 24px; flex: none; text-align: right; }
+  .layer-item input { margin:0; accent-color:var(--accent); }
+  .feature-group { padding:10px 10px 4px; color:var(--muted); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; border-top:1px solid var(--border); }
+  #graph-wrap { flex: 1; position: relative; min-width: 0; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  #search {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 8px; color: var(--text); font-size: 12px; width: 220px;
+  }
+  #search-results { position:absolute; top:48px; left:10px; z-index:4; width:300px; display:none; background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:7px; }
+  #search-results.open { display:block; }
+  .search-result { display:flex; align-items:center; gap:8px; }
+  .search-result .label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .search-result button { background:var(--accent); color:#07111f; border:0; border-radius:4px; padding:5px 8px; cursor:pointer; font-weight:650; }
+  #legend {
+    position: absolute; bottom: 10px; left: 10px; z-index: 2; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 11px;
+    max-width: 260px; max-height: 160px; overflow-y: auto;
+  }
+  #legend .row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+  #legend .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  #banner {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2;
+    background: #3a1e22; border: 1px solid var(--bad); color: #f3b8bd;
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; max-width: 70%;
+  }
+  #meta-bar {
+    position: absolute; top: 10px; right: 10px; z-index: 2; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 11px;
+    color: var(--muted); text-align: right; max-width: 320px;
+  }
+  #meta-bar .msg { color: var(--text); font-size: 12px; margin-bottom: 2px; }
+  #detail {
+    width: 320px; flex: none; background: var(--panel); border-left: 1px solid var(--border);
+    overflow-y: auto; padding: 10px;
+  }
+  #example-workspace {
+    position: absolute; inset: 0; z-index: 5; background: var(--bg); display: none;
+    flex-direction: column;
+  }
+  #example-workspace.open { display: flex; }
+  .workspace-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .workspace-head .spacer { flex: 1; }
+  .workspace-head .title { font-size: 14px; font-weight: 650; margin-right: 12px; }
+  .workspace-breadcrumbs { display:flex; align-items:center; gap:5px; color:var(--muted); font:12px ui-monospace, monospace; }
+  .workspace-breadcrumbs .sep { color:#51596b; }
+  .workspace-option { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; margin-left:8px; }
+  .workspace-option input { accent-color:var(--accent); }
+  .workspace-runner { display:flex; align-items:center; gap:6px; margin-left:8px; padding-left:10px; border-left:1px solid var(--border); }
+  .workspace-runner label { color:var(--muted); font:12px ui-monospace,monospace; }
+  .workspace-runner input { width:68px; background:#10131a; color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 6px; font:12px ui-monospace,monospace; }
+  .workspace-runner select { background:#10131a; color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 6px; font-size:12px; }
+  .workspace-runner button { background:var(--accent); color:#07111f; border:0; border-radius:4px; padding:5px 8px; font-weight:700; cursor:pointer; }
+  .workspace-runner output { min-width:90px; color:#7ee787; font:13px ui-monospace,monospace; }
+  .workspace-tab { background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 6px 10px; cursor: pointer; }
+  .workspace-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .workspace-pane { display: none; flex: 1; min-height: 0; overflow: auto; }
+  .workspace-pane.active { display: flex; }
+  .workspace-code { margin: 0; padding: 28px 34px; width: 100%; color: #e6edf3; background: #10131a; font: 16px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre; }
+  .live-diagram { width:100%; height:100%; background:#10131a; }
+  .spatial-lab { width:100%; padding:24px; display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:16px; background:#10131a; align-content:start; }
+  .lab-card { position:relative; min-height:190px; border:1px solid #485264; border-radius:10px; background:#151a23; padding:18px 22px 18px 58px; overflow:hidden; }
+  .lab-title { font:650 16px ui-monospace,monospace; }
+  .lab-type { display:inline-block; margin-left:8px; border:1px solid #5a6780; border-radius:9px; padding:1px 7px; color:#9da9bd; font:11px ui-monospace,monospace; }
+  .lab-ports { position:absolute; left:0; top:54px; display:flex; flex-direction:column; gap:15px; }
+  .lab-port { display:flex; align-items:center; gap:7px; color:#d7dce5; font:12px ui-monospace,monospace; }
+  .lab-port::before { content:""; width:8px; height:8px; border-radius:50%; background:#5aa9ff; margin-left:-4px; }
+  .lab-body { margin-top:34px; padding:12px 14px; border:1px solid #303849; border-radius:7px; color:#e6edf3; font:14px/1.55 ui-monospace,monospace; white-space:pre-wrap; }
+  .lab-note { margin-top:10px; color:#8b93a7; font-size:11px; }
+  #detail h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; }
+  #detail h2:first-child { margin-top: 0; }
+  #detail .hash { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; color: var(--muted); }
+  table.kv { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.kv td { padding: 2px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.kv td.k { color: var(--muted); white-space: nowrap; padding-right: 8px; }
+  .empty-hint { color: var(--muted); font-size: 12px; padding: 4px 0; }
+  .op-row { padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .op-row:hover { background: var(--panel2); }
+  .op-row .tag { color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
+  .detail-action { width:100%; margin:10px 0 4px; padding:7px 10px; border:0; border-radius:5px; background:var(--accent); color:#07111f; font-weight:700; cursor:pointer; }
+  .diff-add { color: var(--ok); }
+  .diff-rm { color: var(--bad); }
+  .diff-chg { color: #e0b661; }
+  ul.plain { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+  ul.plain li { padding: 2px 0; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trellis Studio</h1>
+  <span class="path" id="resources-path"></span>
+  <div class="spacer"></div>
+  <span id="status"></span>
+  <button id="reload">Reload</button>
+</header>
+<main>
+  <div id="sidebar"></div>
+  <div id="graph-wrap">
+    <input id="search" type="text" placeholder="filter entities...">
+    <div id="search-results"></div>
+    <div id="banner" style="display:none"></div>
+    <div id="meta-bar"></div>
+    <canvas id="canvas"></canvas>
+    <div id="legend"></div>
+    <section id="example-workspace">
+      <div class="workspace-head">
+        <span id="workspace-breadcrumbs" class="workspace-breadcrumbs"></span>
+        <span class="title">Semantic workspace</span>
+        <button class="workspace-tab active" data-pane="graph-pane">Spatial</button>
+        <button class="workspace-tab" data-pane="lab-pane">Layout lab</button>
+        <button class="workspace-tab" data-pane="svg-pane">IR</button>
+        <button class="workspace-tab" data-pane="typst-pane">Typst</button>
+        <button class="workspace-tab" data-pane="debug-pane">Debug</button>
+        <div id="workspace-runner" class="workspace-runner">
+          <select id="runner-engine" aria-label="Execution engine"><option value="deltanet">DeltaNet · parallel</option><option value="ceskr">CESK-R · debug</option></select>
+          <label><span id="runner-parameter">n</span> = <input id="runner-input" type="number" min="0" step="1" value="10"></label>
+          <button id="runner-compute">Compute</button>
+          <output id="runner-output"></output>
+        </div>
+        <span class="spacer"></span>
+        <label class="workspace-option"><input id="show-workspace-attrs" type="checkbox">Show attributes in IR</label>
+        <button id="close-example">Back to graph</button>
+      </div>
+      <div id="graph-pane" class="workspace-pane active"><svg id="workspace-graph" class="live-diagram"></svg></div>
+      <div id="lab-pane" class="workspace-pane"><div id="spatial-lab" class="spatial-lab"></div></div>
+      <div id="svg-pane" class="workspace-pane"><svg id="workspace-svg" class="live-diagram"></svg></div>
+      <div id="typst-pane" class="workspace-pane"><pre id="workspace-typst" class="workspace-code"></pre></div>
+      <div id="debug-pane" class="workspace-pane"><pre id="runner-trace" class="workspace-code">Run with CESK-R to record a sequential machine trace.</pre></div>
+    </section>
+  </div>
+  <div id="detail"></div>
+</main>
+<script>
+"use strict";
+
+let chainData = null;
+let selectedLayerIndex = 0;
+let selectedLayerIndices = new Set();
+let selectionInitialized = false;
+let selectedKey = null; // "entity:<name>" or "content:<id>"
+let filterText = "";
+let openWorkspaceEntity = null;
+
+// ---- simulation state ----
+let simNodes = new Map(); // key -> {x,y,vx,vy,fixed,label,kind,radius}
+let simEdges = [];        // {a,b,role}
+let animHandle = null;
+let transform = { x: 0, y: 0, k: 1 };
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function attrsOf(entity) { return Object.fromEntries(entity.attrs); }
+
+function reachableWorkspace(layer, workspace) {
+  const byName = new Map(layer.graph.entities.map(entity => [entity.entity, entity]));
+  const names = new Set([workspace.entity]);
+  const edges = [];
+  const queue = [workspace.entity];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const edge of layer.graph.edges.filter(item => item.fromEntities.includes(current))) {
+      edges.push(edge);
+      for (const target of edge.toEntities) if (!names.has(target)) { names.add(target); queue.push(target); }
+    }
+  }
+  return { nodes: [...names].map(name => byName.get(name)).filter(Boolean), edges };
+}
+
+function prettyTrellis(workspace, reachable) {
+  const byName = new Map(reachable.nodes.map(node => [node.entity, node]));
+  const child = (node, role) => {
+    const edge = reachable.edges.find(item => item.fromEntities.includes(node.entity) && item.role === role);
+    return edge ? byName.get(edge.toEntities[0]) : null;
+  };
+  const children = (node, prefix) => reachable.edges
+    .filter(item => item.fromEntities.includes(node.entity) && item.role.startsWith(prefix))
+    .sort((a, b) => a.role.localeCompare(b.role))
+    .map(item => byName.get(item.toEntities[0])).filter(Boolean);
+  const expression = node => {
+    if (!node) return "<?>";
+    const attrs = attrsOf(node);
+    if (node.kind === "ir.reference") return attrs.name;
+    if (node.kind === "ir.constructor") {
+      const args = children(node, "argument-").map(expression);
+      return args.length ? `${attrs.name}(${args.join(", ")})` : attrs.name;
+    }
+    if (node.kind === "ir.call") return `${attrs.callee}(${children(node, "argument-").map(expression).join(", ")})`;
+    if (node.kind === "ir.binary") return `${expression(child(node, "left"))} ${attrs.operator} ${expression(child(node, "right"))}`;
+    return `<?>`;
+  };
+  const pattern = node => {
+    const attrs = attrsOf(node);
+    return attrs.binder ? `${attrs.name}(${attrs.binder})` : attrs.name;
+  };
+  const functionHeader = node => {
+    const attrs = attrsOf(node);
+    const params = children(node, "parameter-").map(param => {
+      const value = attrsOf(param); return `${value.name}: ${value.type}`;
+    });
+    return `fn ${attrs.name}(${params.join(", ")}) -> ${attrs.result} =`;
+  };
+  const definition = child(workspace, "definition");
+  const helper = child(definition, "helper");
+  const match = child(helper, "body");
+  const cases = children(match, "case-");
+  const lines = [functionHeader(definition), `  ${functionHeader(helper)}`, `    match ${expression(child(match, "scrutinee"))} with`];
+  for (const branch of cases) lines.push(`    | ${pattern(child(branch, "pattern"))} => ${expression(child(branch, "body"))}`);
+  lines.push("", `  ${expression(child(definition, "body"))}`);
+  return lines.join("\n");
+}
+
+function renderSpatialWorkspace(target, workspace, reachable) {
+  const byName = new Map(reachable.nodes.map(node => [node.entity, node]));
+  const child = (node, role) => {
+    const edge = reachable.edges.find(item => item.fromEntities.includes(node.entity) && item.role === role);
+    return edge ? byName.get(edge.toEntities[0]) : null;
+  };
+  const children = (node, prefix) => reachable.edges
+    .filter(item => item.fromEntities.includes(node.entity) && item.role.startsWith(prefix))
+    .sort((a, b) => a.role.localeCompare(b.role))
+    .map(item => byName.get(item.toEntities[0])).filter(Boolean);
+  const expression = node => {
+    if (!node) return "<?>";
+    const attrs = attrsOf(node);
+    if (node.kind === "ir.reference") return attrs.name;
+    if (node.kind === "ir.constructor") {
+      const args = children(node, "argument-").map(expression);
+      return args.length ? `${attrs.name}(${args.join(", ")})` : attrs.name;
+    }
+    if (node.kind === "ir.call") return `${attrs.callee}(${children(node, "argument-").map(expression).join(", ")})`;
+    if (node.kind === "ir.binary") return `${expression(child(node, "left"))} ${attrs.operator} ${expression(child(node, "right"))}`;
+    return "<?>";
+  };
+  const pattern = node => { const a = attrsOf(node); return a.binder ? `${a.name}(${a.binder})` : a.name; };
+  const definition = child(workspace, "definition");
+  const helper = child(definition, "helper");
+  const match = child(helper, "body");
+  const outer = attrsOf(definition), inner = attrsOf(helper);
+  const outerParams = children(definition, "parameter-");
+  const helperParams = children(helper, "parameter-");
+  const cases = children(match, "case-");
+  const esc = escapeHtml;
+  const symbols = [...outerParams, ...helperParams].map(param => attrsOf(param).name);
+  const symbolClass = name => { const index=symbols.indexOf(name); return `symbol-${index < 0 ? 4 : index % 5}`; };
+  const symbol = name => `<tspan class="symbol ${symbolClass(name)}">${esc(name)}</tspan>`;
+  const port = (entity, x, y, label, side) => { const cls=side === "right" ? "result-port" : symbolClass(label); return `<g data-trellis-entity="${esc(entity)}"><circle cx="${x}" cy="${y}" r="7" class="port-dot ${cls}"/><text x="${side === "left" ? x+14 : x-14}" y="${y+5}" text-anchor="${side === "left" ? "start" : "end"}" class="port-label symbol ${cls}">${esc(label)}</text></g>`; };
+  const typeBadge = (x, y, value) => `<g><rect x="${x}" y="${y-15}" width="${Math.max(42,value.length*9+16)}" height="23" rx="11" class="type-badge"/><text x="${x+9}" y="${y+1}" class="type-label">${esc(value)}</text></g>`;
+  const branchY = [375, 480];
+  const branchRects = cases.map((branch, index) => {
+    const p = child(branch, "pattern"), body = child(branch, "body"), y = branchY[index] || 405 + index * 105;
+    return `<g data-trellis-entity="${esc(branch.entity)}"><rect x="245" y="${y}" width="560" height="78" rx="9" class="branch-box"/></g>`;
+  }).join("");
+  const branchTexts = cases.map((branch, index) => {
+    const p = child(branch, "pattern"), body = child(branch, "body"), y = branchY[index] || 405 + index * 105;
+    const bodyAttrs = attrsOf(body);
+    let glyph = `<text x="285" y="${y+54}" class="expr-label" data-trellis-entity="${esc(body.entity)}">${esc(expression(body))}</text>`;
+    if (body.kind === "ir.reference") glyph = `<text x="285" y="${y+54}" class="expr-label" data-trellis-entity="${esc(body.entity)}">${symbol(bodyAttrs.name)}</text>`;
+    else if (body.kind === "ir.call") {
+      const a0=child(body,"argument-0"), a1=child(body,"argument-1"), binary=child(body,"argument-2");
+      const n0=attrsOf(a0).name, n1=attrsOf(a1).name, left=attrsOf(child(binary,"left")).name, right=attrsOf(child(binary,"right")).name;
+      glyph = `<text x="285" y="${y+54}" class="expr-label" data-trellis-entity="${esc(body.entity)}">${esc(bodyAttrs.callee)}(${symbol(n0)}, ${symbol(n1)}, ${symbol(left)} ${esc(attrsOf(binary).operator)} ${symbol(right)})</text>`;
+    }
+    return `<g><text x="263" y="${y+24}" class="branch-label">${esc(pattern(p))}</text>${glyph}</g>`;
+  }).join("");
+  const helperPorts = helperParams.map((param, index) => { const a=attrsOf(param); return port(param.entity, 170, 250+index*42, a.name, "left"); }).join("");
+  const outerPorts = outerParams.map((param, index) => { const a=attrsOf(param); return port(param.entity, 40, 125+index*42, a.name, "left"); }).join("");
+  target.setAttribute("viewBox", "0 0 980 760");
+  target.innerHTML = `<style>
+    .scope-box{fill:#121721;stroke:#58a6ff;stroke-width:2}.nested-box{fill:#161b22;stroke:#8b949e;stroke-width:1.5}.branch-box{fill:#10151d;stroke:#394150}.scope-title{fill:#e6edf3;font:600 18px ui-monospace,monospace}.scope-kind{fill:#8b949e;font:12px ui-monospace,monospace}.port-dot{stroke:#d8e8ff;stroke-width:1}.port-label{font:14px ui-monospace,monospace}.type-label{fill:#aab6ca;font:12px ui-monospace,monospace}.type-badge{fill:#202938;stroke:#5a6780}.branch-label{fill:#d2a8ff;font:13px ui-monospace,monospace}.expr-label{fill:#e6edf3;font:16px ui-monospace,monospace}.symbol-0{fill:#79c0ff}.symbol-1{fill:#d2a8ff}.symbol-2{fill:#7ee787}.symbol-3{fill:#ffa657}.symbol-4{fill:#ff7b72}.result-port{fill:#58a6ff}.flow-wire{fill:none;stroke:#58a6ff;stroke-width:2;marker-end:url(#spatial-arrow)}
+  </style><defs><marker id="spatial-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#58a6ff"/></marker></defs>
+  <g data-trellis-entity="${esc(definition.entity)}"><rect x="40" y="35" width="900" height="680" rx="14" class="scope-box"/><text x="65" y="68" class="scope-kind">function scope</text><text x="65" y="94" class="scope-title">fn ${esc(outer.name)}</text></g>
+  ${outerPorts}${port(definition.entity,940,125,"result","right")}${typeBadge(800,88,outer.result)}
+  <g data-trellis-entity="${esc(helper.entity)}"><rect x="170" y="170" width="680" height="430" rx="13" class="nested-box"/><text x="195" y="203" class="scope-kind">nested function scope</text><text x="195" y="228" class="scope-title">fn ${esc(inner.name)}</text></g>
+  ${helperPorts}${port(helper.entity,850,260,"result","right")}${typeBadge(740,218,inner.result)}
+  <text x="245" y="345" class="expr-label">match ${symbol(expression(child(match,"scrutinee")))}</text>${branchRects}${branchTexts}
+  <path d="M 850 260 C 900 260, 900 125, 933 125" class="flow-wire"/>
+  <text x="95" y="645" class="scope-kind">body</text><text x="130" y="680" class="expr-label" data-trellis-entity="${esc(child(definition,"body").entity)}">${esc(attrsOf(child(definition,"body")).callee)}(${symbol(attrsOf(child(child(definition,"body"),"argument-0")).name)}, zero, succ(zero))</text>`;
+}
+
+function renderSpatialLab() {
+  const scenarios = [
+    {name:"factorial", type:"Nat", ports:["n"], body:"if n == zero\n  one\nelse n * factorial(pred(n))", note:"Direct recursion: call-to-definition links compete with value links."},
+    {name:"map", type:"A · B · List", ports:["f", "xs"], body:"match xs\n  []       → []\n  x :: rest → f(x) :: map(f, rest)", note:"Higher-order and polymorphic ports need grouped type variables."},
+    {name:"multiply", type:"Nat", ports:["x", "capture scale"], body:"x * scale", note:"A capture must visibly cross the function boundary."},
+    {name:"save", type:"Data · FileSystem", ports:["data", "fs effect"], body:"write(\"/tmp/result\", data)", note:"Capabilities need a distinct port class, not another annotation."},
+    {name:"partition", type:"A · List", ports:["predicate", "items"], body:"fold items into\n  accepted | rejected", note:"Multiple results require named output ports and routing."},
+    {name:"transform8", type:"Matrix · Vec", ports:["matrix", "a", "b", "c", "d", "e", "f", "g", "h"], body:"matrix × [a … h]", note:"High arity breaks vertical boundary lists; bundling becomes necessary."}
+  ];
+  document.getElementById("spatial-lab").innerHTML = scenarios.map(item => `<section class="lab-card"><div><span class="lab-title">fn ${escapeHtml(item.name)}</span><span class="lab-type">${escapeHtml(item.type)}</span></div><div class="lab-ports">${item.ports.map(port => `<span class="lab-port">${escapeHtml(port)}</span>`).join("")}</div><div class="lab-body">${escapeHtml(item.body)}</div><div class="lab-note">${escapeHtml(item.note)}</div></section>`).join("");
+}
+
+function workspaceProjection(reachable, includeAttrs) {
+  if (!includeAttrs) return reachable;
+  const nodes = [...reachable.nodes];
+  const edges = [...reachable.edges];
+  for (const node of reachable.nodes) {
+    for (const [key, value] of node.attrs) {
+      const entity = `${node.entity}.@${key}`;
+      nodes.push({ entity, kind: "core.attribute", attrs: [["key", key], ["value", value]], ports: [] });
+      edges.push({ fromEntities: [node.entity], toEntities: [entity], role: "attribute" });
+    }
+  }
+  return { nodes, edges };
+}
+
+function renderLiveDiagram(target, reachable, uml) {
+  const width = 980, row = 92, x = uml ? 170 : 80, boxWidth = uml ? 600 : 470;
+  const nodes = reachable.nodes;
+  const workspace = nodes.find(node => node.kind === "example.workspace");
+  const namespace = workspace ? workspace.entity.split(".").slice(0, -1).join(".") : "";
+  const displayEntity = entity => namespace && entity.startsWith(namespace + ".") ? entity.slice(namespace.length + 1) : entity;
+  const positions = new Map(nodes.map((node, index) => [node.entity, {x, y:50 + index * row}]));
+  const paths = reachable.edges.map(edge => {
+    const from = positions.get(edge.fromEntities[0]), to = positions.get(edge.toEntities[0]);
+    if (!from || !to) return "";
+    const tail = edge.role === "tail-control" && to.y < from.y;
+    const d = tail ? `M ${from.x+boxWidth} ${from.y+28} C 900 ${from.y+28}, 900 ${to.y+28}, ${to.x+boxWidth} ${to.y+28}` : `M ${from.x+boxWidth/2} ${from.y+56} L ${to.x+boxWidth/2} ${to.y}`;
+    return `<path d="${d}" fill="none" stroke="${tail ? "#3fb950" : "#6e7681"}" stroke-width="2.5" marker-end="url(#arrow)"/><text x="${from.x+boxWidth+8}" y="${from.y+20}" fill="#8b949e" font-size="11">${escapeHtml(edge.role)}</text>`;
+  }).join("");
+  const boxes = nodes.map(node => {
+    const p = positions.get(node.entity), attrs = attrsOf(node);
+    const detail = uml ? Object.entries(attrs).filter(([key]) => key !== "query").slice(0,3).map(([k,v]) => `${k}: ${v}`).join(" · ") : node.kind;
+    return `<g data-trellis-entity="${escapeHtml(node.entity)}"><rect x="${p.x}" y="${p.y}" width="${boxWidth}" height="56" rx="8" fill="#161b22" stroke="#58a6ff"/><text x="${p.x+14}" y="${p.y+23}" fill="#e6edf3" font-family="monospace" font-size="14">${escapeHtml(displayEntity(node.entity))}</text><text x="${p.x+14}" y="${p.y+43}" fill="#8b949e" font-family="monospace" font-size="11">${escapeHtml(detail)}</text></g>`;
+  }).join("");
+  target.setAttribute("viewBox", `0 0 ${width} ${Math.max(620,nodes.length*row+80)}`);
+  target.innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6e7681"/></marker></defs>${paths}${boxes}`;
+}
+
+function openWorkspace(workspace) {
+  openWorkspaceEntity = workspace.entity;
+  document.getElementById("example-workspace").classList.add("open");
+  const attrs = attrsOf(workspace);
+  const namespace = workspace.entity.split(".").slice(0, -1);
+  document.getElementById("workspace-breadcrumbs").innerHTML = namespace.map((part, index) =>
+    `${index ? '<span class="sep">›</span>' : ''}<span>${escapeHtml(part)}</span>`).join("");
+  document.querySelector("#example-workspace .title").textContent = attrs.name || workspace.entity;
+  const reachable = reachableWorkspace(currentLayer(), workspace);
+  const projected = workspaceProjection(reachable, document.getElementById("show-workspace-attrs").checked);
+  const definition = prettyTrellis(workspace, reachable);
+  const functionNode = reachable.nodes.find(node => node.kind === "ir.function" && reachable.edges.some(edge => edge.fromEntities.includes(workspace.entity) && edge.toEntities.includes(node.entity) && edge.role === "definition"));
+  const parameterEdge = functionNode && reachable.edges.find(edge => edge.fromEntities.includes(functionNode.entity) && edge.role === "parameter-0");
+  const parameterNode = parameterEdge && reachable.nodes.find(node => parameterEdge.toEntities.includes(node.entity));
+  document.getElementById("runner-parameter").textContent = parameterNode ? attrsOf(parameterNode).name : "argument";
+  document.getElementById("runner-output").textContent = "";
+  document.getElementById("runner-trace").textContent = "Run with CESK-R to record a sequential machine trace.";
+  const compute = async () => {
+    const output = document.getElementById("runner-output");
+    const button = document.getElementById("runner-compute");
+    try {
+      button.disabled = true;
+      output.textContent = "running…";
+      const engine = document.getElementById("runner-engine").value;
+      const query = new URLSearchParams({workspace:workspace.entity, arg:document.getElementById("runner-input").value, engine});
+      const response = await fetch(`/api/execute?${query}`, {cache:"no-store"});
+      const run = await response.json();
+      if (!response.ok) throw new Error(run.error || `runtime HTTP ${response.status}`);
+      output.textContent = `= ${run.value}`;
+      output.title = `${run.engine} · ${run.reductions} reductions · ${run.elapsedMs.toFixed(2)} ms`;
+      document.getElementById("runner-trace").textContent = run.engine === "ceskr"
+        ? `${attrs.name || workspace.entity}\nengine: CESK-R sequential\nresult: ${run.value}\nreductions: ${run.reductions}\n\n${run.trace.join("\n")}`
+        : `DeltaNet parallel result: ${run.value}\nreductions: ${run.reductions}\nrounds: ${run.rounds}\nelapsed: ${run.elapsedMs.toFixed(2)} ms\n\nSelect CESK-R · debug and compute again for the sequential machine trace.`;
+    } catch (error) {
+      output.textContent = `! ${error.message}`;
+      output.title = error.stack || String(error);
+    } finally {
+      button.disabled = false;
+    }
+  };
+  document.getElementById("runner-compute").onclick = compute;
+  document.getElementById("runner-input").onkeydown = event => { if (event.key === "Enter") compute(); };
+  renderSpatialWorkspace(document.getElementById("workspace-graph"), workspace, projected);
+  renderSpatialLab();
+  renderLiveDiagram(document.getElementById("workspace-svg"), projected, true);
+  document.getElementById("workspace-typst").textContent = `#set document(title: "${attrs.name}")\n#set text(font: "Libertinus Serif")\n\n= ${attrs.name}\n\n\`\`\`trellis\n${definition}\n\`\`\`\n\nInvariant: \`${attrs.invariant}\``;
+}
+
+function closeExampleWorkspace() {
+  document.getElementById("example-workspace").classList.remove("open");
+  openWorkspaceEntity = null;
+}
+
+document.getElementById("close-example").addEventListener("click", closeExampleWorkspace);
+document.getElementById("show-workspace-attrs").addEventListener("change", () => {
+  if (!openWorkspaceEntity) return;
+  const workspace = currentLayer().graph.entities.find(entity => entity.entity === openWorkspaceEntity);
+  if (workspace) openWorkspace(workspace);
+});
+for (const tab of document.querySelectorAll(".workspace-tab")) {
+  tab.addEventListener("click", () => {
+    for (const item of document.querySelectorAll(".workspace-tab")) item.classList.toggle("active", item === tab);
+    for (const pane of document.querySelectorAll(".workspace-pane")) pane.classList.toggle("active", pane.id === tab.dataset.pane);
+  });
+}
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+}
+window.addEventListener("resize", resizeCanvas);
+
+function shortHash(h, n = 10) { return h ? h.slice(0, n) : ""; }
+
+function nsOf(kind) { return kind.split(".")[0]; }
+
+function colorFor(ns) {
+  let h = 0;
+  for (let i = 0; i < ns.length; i++) h = (h * 31 + ns.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue} 62% 58%)`;
+}
+
+async function loadChain() {
+  document.getElementById("status").textContent = "loading...";
+  try {
+    const res = await fetch("/api/chain", { cache: "no-store" });
+    chainData = await res.json();
+    document.getElementById("status").textContent =
+      `${chainData.layers.length} layers` +
+      (chainData.unparsed.length ? `, ${chainData.unparsed.length} unparsed` : "") +
+      (chainData.unlinked.length ? `, ${chainData.unlinked.length} unlinked` : "");
+    if (!selectionInitialized) {
+      selectedLayerIndex = chainData.layers.length - 1;
+      selectedLayerIndices = new Set([selectedLayerIndex]);
+      selectionInitialized = true;
+    }
+    renderSidebar();
+    selectLayer(selectedLayerIndex);
+    if (filterText.trim().length >= 3) applyEntitySearch();
+  } catch (e) {
+    document.getElementById("status").textContent = "load failed: " + e;
+  }
+}
+
+function renderSidebar() {
+  const el = document.getElementById("sidebar");
+  el.innerHTML = "";
+  if (chainData.unparsed.length || chainData.unlinked.length) {
+    const box = document.createElement("div");
+    box.className = "warn-box";
+    let html = "";
+    for (const u of chainData.unparsed) {
+      html += `<div class="t">⚠ unparsed: ${escapeHtml(u.relativePath)}</div><div>${escapeHtml(u.error)}</div>`;
+    }
+    for (const u of chainData.unlinked) {
+      html += `<div class="t">⚠ unlinked: ${escapeHtml(u.relativePath)}</div><div>${escapeHtml(u.reason)}</div>`;
+    }
+    box.innerHTML = html;
+    el.appendChild(box);
+  }
+  const groups = new Map();
+  for (const layer of [...chainData.layers].reverse()) {
+    const name = layer.relativePath ? layer.relativePath.split("/").pop().replace(/\.delta$/, "") : "F0";
+    const feature = name.replace(/\d+$/, "") || name;
+    if (!groups.has(feature)) groups.set(feature, []);
+    groups.get(feature).push({layer, name});
+  }
+  for (const [feature, members] of groups) {
+    const heading = document.createElement("div");
+    heading.className = "feature-group";
+    heading.textContent = feature;
+    el.appendChild(heading);
+    for (const {layer, name} of members) {
+      const div = document.createElement("div");
+      div.className = "layer-item" + (selectedLayerIndices.has(layer.index) ? " selected" : "");
+      div.innerHTML =
+        `<input type="checkbox" ${selectedLayerIndices.has(layer.index) ? "checked" : ""} aria-label="Show ${escapeHtml(name)}">` +
+        `<span class="idx">${layer.index}</span>` +
+        `<span class="dot ${layer.status === "ok" ? "ok" : "bad"}"></span>` +
+        `<span class="name" title="${escapeHtml(layer.relativePath || "synthetic F0 graph")}">${escapeHtml(name)}</span>`;
+      div.onclick = event => {
+        event.preventDefault();
+        toggleLayer(layer.index);
+      };
+      el.appendChild(div);
+    }
+  }
+}
+
+function toggleLayer(index) {
+  if (selectedLayerIndices.has(index)) selectedLayerIndices.delete(index); else selectedLayerIndices.add(index);
+  if (!selectedLayerIndices.size) selectedLayerIndices.add(index);
+  selectedLayerIndex = Math.max(...selectedLayerIndices);
+  selectLayer(selectedLayerIndex);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function currentLayer() { return chainData.layers[selectedLayerIndex]; }
+
+function selectLayer(index) {
+  selectedLayerIndex = index;
+  selectedKey = null;
+  renderSidebar();
+  const layer = currentLayer();
+
+  const banner = document.getElementById("banner");
+  if (layer.status !== "ok") {
+    banner.style.display = "block";
+    banner.textContent = "⚠ " + layer.error;
+  } else {
+    banner.style.display = "none";
+  }
+
+  const meta = document.getElementById("meta-bar");
+  if (layer.index === 0) {
+    meta.innerHTML = `<div class="msg">F0 bootstrap graph</div><div>${layer.graph.nodeCount} nodes / ${layer.graph.edgeCount} edges</div>`;
+  } else {
+    meta.innerHTML =
+      `<div class="msg">${escapeHtml(layer.message || "")}</div>` +
+      `<div>${escapeHtml(layer.author || "")} · ${shortHash(layer.changeId)}</div>` +
+      `<div>${layer.graph.nodeCount} nodes / ${layer.graph.edgeCount} edges</div>`;
+  }
+  document.getElementById("resources-path").textContent = layer.relativePath || "";
+
+  buildSimulation(layer, selectedLayerIndices);
+  renderLegend(layer);
+  renderDetail(null);
+}
+
+function buildSimulation(layer, selectedIndices = new Set([layer.index])) {
+  simNodes = new Map();
+  simEdges = [];
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.width / 2, cy = rect.height / 2;
+
+  const visibleNames = new Set();
+  for (const index of selectedIndices) {
+    const selected = chainData.layers[index];
+    if (index === 0) selected.graph.entities.forEach(entity => visibleNames.add(entity.entity));
+    selected.diff.addedEntities.forEach(name => visibleNames.add(name));
+    selected.diff.replacedEntities.forEach(item => visibleNames.add(item.entity));
+  }
+  const visibleEntities = layer.graph.entities.filter(entity => visibleNames.has(entity.entity));
+
+  const n = visibleEntities.length || 1;
+  const spread = 40 * Math.sqrt(n);
+  let i = 0;
+  for (const e of visibleEntities) {
+    const angle = (i / n) * Math.PI * 2 * 7 + i;
+    const r = spread * Math.sqrt((i + 1) / n) * 0.6;
+    simNodes.set("entity:" + e.entity, {
+      x: cx + Math.cos(angle) * r + (Math.random() - 0.5) * 20,
+      y: cy + Math.sin(angle) * r + (Math.random() - 0.5) * 20,
+      vx: 0, vy: 0, fixed: false,
+      label: e.entity, kind: e.kind, radius: 5 + Math.min(6, e.ports.length),
+      contentId: e.contentId,
+    });
+    i++;
+  }
+
+  function ensureContentNode(contentId, entities) {
+    if (entities && entities.length) return "entity:" + entities[0];
+    const key = "content:" + contentId;
+    if (!simNodes.has(key)) {
+      simNodes.set(key, {
+        x: cx + (Math.random() - 0.5) * spread, y: cy + (Math.random() - 0.5) * spread,
+        vx: 0, vy: 0, fixed: false, label: shortHash(contentId, 8) + "…",
+        kind: "(unbound)", radius: 3, contentId,
+      });
+    }
+    return key;
+  }
+
+  for (const e of layer.graph.edges.filter(edge => edge.fromEntities.some(name => visibleNames.has(name)) && edge.toEntities.some(name => visibleNames.has(name)))) {
+    const a = ensureContentNode(e.fromNode, e.fromEntities);
+    const b = ensureContentNode(e.toNode, e.toEntities);
+    if (a !== b) simEdges.push({ a, b, role: e.role });
+  }
+
+  startSim();
+}
+
+let simRunning = false;
+function startSim() {
+  if (animHandle) cancelAnimationFrame(animHandle);
+  simRunning = true;
+  let settleTicks = 0;
+  function frame() {
+    if (!simRunning) return;
+    const moving = tick();
+    draw();
+    settleTicks = moving ? 0 : settleTicks + 1;
+    if (settleTicks < 60) {
+      animHandle = requestAnimationFrame(frame);
+    } else {
+      animHandle = null; // settled; redraw only on interaction
+    }
+  }
+  animHandle = requestAnimationFrame(frame);
+}
+function wakeSim() { if (!animHandle) { simRunning = true; animHandle = requestAnimationFrame(function f() { const m = tick(); draw(); if (m) animHandle = requestAnimationFrame(f); else animHandle = null; }); } }
+
+function tick() {
+  const nodes = [...simNodes.values()];
+  const rect = canvas.getBoundingClientRect();
+  const cx = rect.width / 2, cy = rect.height / 2;
+  const REPEL = 2600, SPRING = 0.02, LEN = 70, DAMP = 0.82, GRAV = 0.0025;
+
+  for (let i = 0; i < nodes.length; i++) {
+    let fx = 0, fy = 0;
+    const ni = nodes[i];
+    for (let j = 0; j < nodes.length; j++) {
+      if (i === j) continue;
+      const nj = nodes[j];
+      let dx = ni.x - nj.x, dy = ni.y - nj.y;
+      let d2 = dx * dx + dy * dy;
+      if (d2 < 1) d2 = 1;
+      const f = REPEL / d2;
+      const d = Math.sqrt(d2);
+      fx += (dx / d) * f;
+      fy += (dy / d) * f;
+    }
+    fx += (cx - ni.x) * GRAV;
+    fy += (cy - ni.y) * GRAV;
+    ni._fx = fx; ni._fy = fy;
+  }
+  for (const e of simEdges) {
+    const a = simNodes.get(e.a), b = simNodes.get(e.b);
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    const f = (d - LEN) * SPRING;
+    const fx = (dx / d) * f, fy = (dy / d) * f;
+    a._fx += fx; a._fy += fy;
+    b._fx -= fx; b._fy -= fy;
+  }
+  let maxSpeed = 0;
+  for (const ni of nodes) {
+    if (ni.fixed) { ni.vx = 0; ni.vy = 0; continue; }
+    ni.vx = (ni.vx + ni._fx) * DAMP;
+    ni.vy = (ni.vy + ni._fy) * DAMP;
+    ni.x += ni.vx * 0.02;
+    ni.y += ni.vy * 0.02;
+    maxSpeed = Math.max(maxSpeed, Math.abs(ni.vx), Math.abs(ni.vy));
+  }
+  return maxSpeed > 0.05;
+}
+
+function draw() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, rect.width, rect.height);
+  ctx.translate(transform.x, transform.y);
+  ctx.scale(transform.k, transform.k);
+
+  const selNode = selectedKey ? simNodes.get(selectedKey) : null;
+  const neighbors = new Set();
+  if (selNode) {
+    for (const e of simEdges) {
+      if (e.a === selectedKey) neighbors.add(e.b);
+      if (e.b === selectedKey) neighbors.add(e.a);
+    }
+  }
+
+  ctx.lineWidth = 1 / transform.k;
+  for (const e of simEdges) {
+    const a = simNodes.get(e.a), b = simNodes.get(e.b);
+    if (!a || !b) continue;
+    const hi = selectedKey && (e.a === selectedKey || e.b === selectedKey);
+    ctx.strokeStyle = hi ? "#5aa9ff" : "rgba(255,255,255,0.14)";
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  const q = filterText.trim().toLowerCase();
+  for (const [key, n] of simNodes) {
+    const dim = q && !n.label.toLowerCase().includes(q) && !n.kind.toLowerCase().includes(q);
+    const isSel = key === selectedKey;
+    const isNeighbor = neighbors.has(key);
+    ctx.globalAlpha = dim ? 0.15 : 1;
+    ctx.fillStyle = n.kind === "(unbound)" ? "#5b5f6b" : colorFor(nsOf(n.kind));
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, isSel ? n.radius + 2.5 : n.radius, 0, Math.PI * 2);
+    ctx.fill();
+    if (isSel || isNeighbor) {
+      ctx.lineWidth = 1.5 / transform.k;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
+    }
+    // Below ~60 nodes there's room to label everything; above that, labels
+    // only earn their clutter when zoomed in, selected, or a neighbor of
+    // the selection -- otherwise a few hundred nodes becomes unreadable.
+    const labelsCrowded = simNodes.size > 60;
+    const showLabel = !dim && (isSel || isNeighbor || !labelsCrowded || transform.k > 1.3);
+    if (showLabel) {
+      ctx.globalAlpha = isSel || isNeighbor ? 1 : 0.85;
+      ctx.fillStyle = isSel ? "#ffffff" : "#c7cbd6";
+      ctx.font = `${(isSel ? 12 : 11) / Math.max(transform.k, 1)}px ui-monospace, monospace`;
+      ctx.fillText(n.label, n.x + n.radius + 3, n.y + 3);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function renderLegend(layer) {
+  const namespaces = new Map();
+  for (const {kind} of simNodes.values()) {
+    const ns = nsOf(kind);
+    namespaces.set(ns, (namespaces.get(ns) || 0) + 1);
+  }
+  const el = document.getElementById("legend");
+  el.innerHTML = "";
+  for (const [ns, count] of [...namespaces.entries()].sort((a, b) => b[1] - a[1])) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="sw" style="background:${colorFor(ns)}"></span>${escapeHtml(ns)} (${count})`;
+    el.appendChild(row);
+  }
+}
+
+// ---- interaction ----
+let dragging = null, panStart = null;
+canvas.addEventListener("mousedown", ev => {
+  const p = toWorld(ev);
+  const hit = hitTest(p);
+  if (hit) {
+    dragging = hit;
+    simNodes.get(hit).fixed = true;
+  } else {
+    panStart = { x: ev.clientX - transform.x, y: ev.clientY - transform.y };
+    canvas.classList.add("dragging");
+  }
+});
+window.addEventListener("mousemove", ev => {
+  if (dragging) {
+    const rect = canvas.getBoundingClientRect();
+    const wx = (ev.clientX - rect.left - transform.x) / transform.k;
+    const wy = (ev.clientY - rect.top - transform.y) / transform.k;
+    const n = simNodes.get(dragging);
+    n.x = wx; n.y = wy; n.vx = 0; n.vy = 0;
+    wakeSim(); draw();
+  } else if (panStart) {
+    transform.x = ev.clientX - panStart.x;
+    transform.y = ev.clientY - panStart.y;
+    draw();
+  }
+});
+window.addEventListener("mouseup", () => {
+  if (dragging) { /* keep pinned so layout stays put; double-click to release */ }
+  dragging = null; panStart = null;
+  canvas.classList.remove("dragging");
+});
+canvas.addEventListener("dblclick", ev => {
+  const hit = hitTest(toWorld(ev));
+  if (hit) { simNodes.get(hit).fixed = false; wakeSim(); }
+});
+canvas.addEventListener("click", ev => {
+  if (panStart) return;
+  const hit = hitTest(toWorld(ev));
+  selectedKey = hit;
+  renderDetail(hit);
+  draw();
+});
+canvas.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+  const factor = Math.exp(-ev.deltaY * 0.001);
+  const newK = Math.min(4, Math.max(0.1, transform.k * factor));
+  transform.x = mx - ((mx - transform.x) / transform.k) * newK;
+  transform.y = my - ((my - transform.y) / transform.k) * newK;
+  transform.k = newK;
+  draw();
+}, { passive: false });
+
+function toWorld(ev) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: (ev.clientX - rect.left - transform.x) / transform.k, y: (ev.clientY - rect.top - transform.y) / transform.k };
+}
+function hitTest(p) {
+  let best = null, bestD = 10 / transform.k;
+  for (const [key, n] of simNodes) {
+    const d = Math.hypot(n.x - p.x, n.y - p.y);
+    if (d < Math.max(bestD, n.radius + 3)) { best = key; bestD = d; }
+  }
+  return best;
+}
+
+document.getElementById("search").addEventListener("input", ev => {
+  filterText = ev.target.value;
+  if (chainData) applyEntitySearch();
+});
+
+function applyEntitySearch() {
+  const query = filterText.trim().toLowerCase();
+  const results = document.getElementById("search-results");
+  results.classList.remove("open");
+  results.innerHTML = "";
+  if (query.length >= 3) {
+    for (let index = chainData.layers.length - 1; index >= 0; index--) {
+      const match = chainData.layers[index].graph.entities.find(entity => {
+        const attrs = Object.fromEntries(entity.attrs);
+        return entity.entity.toLowerCase().includes(query) || entity.kind.toLowerCase().includes(query) ||
+          String(attrs.name || "").toLowerCase().includes(query) || String(attrs.query || "").toLowerCase().split(";").includes(query);
+      });
+      if (match) {
+        if (selectedLayerIndex !== index) selectLayer(index);
+        selectedKey = "entity:" + match.entity;
+        renderDetail(selectedKey);
+        draw();
+        const attrs = attrsOf(match);
+        const row = document.createElement("div");
+        row.className = "search-result";
+        row.innerHTML = `<span class="label">${escapeHtml(attrs.name || match.entity)}</span>`;
+        if (match.kind === "example.workspace") {
+          const button = document.createElement("button");
+          button.textContent = "Open workspace";
+          button.onclick = () => { results.classList.remove("open"); openWorkspace(match); };
+          row.appendChild(button);
+        }
+        results.appendChild(row);
+        results.classList.add("open");
+        break;
+      }
+    }
+  } else {
+    draw();
+  }
+}
+
+// ---- detail panel ----
+function renderDetail(key) {
+  const el = document.getElementById("detail");
+  const layer = currentLayer();
+  if (!key) {
+    el.innerHTML = diffHtml(layer) + opsHtml(layer);
+    return;
+  }
+  const n = simNodes.get(key);
+  if (!n) { el.innerHTML = ""; return; }
+  let html = `<h2>Selected node</h2>`;
+  html += `<table class="kv">`;
+  if (key.startsWith("entity:")) html += kv("entity", n.label);
+  html += kv("kind", n.kind);
+  html += kv("content id", `<span class="hash">${n.contentId}</span>`);
+  html += `</table>`;
+
+  const entity = layer.graph.entities.find(e => "entity:" + e.entity === key);
+  if (entity) {
+    if (entity.kind === "example.workspace") html += `<button id="detail-open-workspace" class="detail-action">Open workspace</button>`;
+    if (entity.ports.length) {
+      html += `<h2>Ports</h2><table class="kv">`;
+      for (const p of entity.ports) html += kv(p.name, `${p.direction} : ${escapeHtml(p.ty)}`);
+      html += `</table>`;
+    }
+    if (entity.attrs.length) {
+      html += `<h2>Attrs</h2><table class="kv">`;
+      for (const [k, v] of entity.attrs) html += kv(k, escapeHtml(v));
+      html += `</table>`;
+    }
+  }
+  html += diffHtml(layer);
+  html += opsHtml(layer);
+  el.innerHTML = html;
+  const openButton = document.getElementById("detail-open-workspace");
+  if (openButton && entity) openButton.onclick = () => openWorkspace(entity);
+}
+
+function kv(k, v) { return `<tr><td class="k">${escapeHtml(k)}</td><td>${v}</td></tr>`; }
+
+function diffHtml(layer) {
+  const d = layer.diff;
+  const any = d.addedEntities.length || d.removedEntities.length || d.replacedEntities.length || d.addedRoots.length || d.removedRoots.length;
+  if (!any) return `<h2>Diff vs. previous layer</h2><div class="empty-hint">no entity/root changes</div>`;
+  let html = `<h2>Diff vs. previous layer</h2><ul class="plain">`;
+  for (const e of d.addedEntities) html += `<li class="diff-add">+ ${escapeHtml(e)}</li>`;
+  for (const e of d.removedEntities) html += `<li class="diff-rm">- ${escapeHtml(e)}</li>`;
+  for (const r of d.replacedEntities) html += `<li class="diff-chg">~ ${escapeHtml(r.entity)}</li>`;
+  for (const r of d.addedRoots) html += `<li class="diff-add">+ root ${escapeHtml(r)}</li>`;
+  for (const r of d.removedRoots) html += `<li class="diff-rm">- root ${escapeHtml(r)}</li>`;
+  html += `</ul>`;
+  return html;
+}
+
+function opsHtml(layer) {
+  if (!layer.ops.length) return "";
+  let html = `<h2>Operations (${layer.ops.length})</h2>`;
+  layer.ops.forEach((op, i) => {
+    const subject = op.entity || op.name || (op.node ? op.node.kind : "") || (op.edge ? "edge" : "");
+    html += `<div class="op-row" data-i="${i}"><span class="tag">${op.op}</span> ${escapeHtml(subject)}</div>`;
+  });
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  setTimeout(() => {
+    document.querySelectorAll(".op-row").forEach(row => {
+      row.onclick = () => jumpToOp(layer.ops[+row.dataset.i]);
+    });
+  }, 0);
+  return html;
+}
+
+function jumpToOp(op) {
+  let key = null;
+  if (op.entity) key = "entity:" + op.entity;
+  else if (op.node) key = simNodes.has("content:" + op.node.contentId) ? "content:" + op.node.contentId : null;
+  if (key && simNodes.has(key)) {
+    selectedKey = key;
+    renderDetail(key);
+    const n = simNodes.get(key);
+    const rect = canvas.getBoundingClientRect();
+    transform.x = rect.width / 2 - n.x * transform.k;
+    transform.y = rect.height / 2 - n.y * transform.k;
+    draw();
+  }
+}
+
+document.getElementById("reload").onclick = loadChain;
+document.addEventListener("keydown", ev => {
+  if (document.activeElement === document.getElementById("search")) return;
+  if (ev.key === "ArrowDown" && selectedLayerIndex < chainData.layers.length - 1) selectLayer(selectedLayerIndex + 1);
+  if (ev.key === "ArrowUp" && selectedLayerIndex > 0) selectLayer(selectedLayerIndex - 1);
+});
+
+resizeCanvas();
+loadChain();
+</script>
+</body>
+</html>

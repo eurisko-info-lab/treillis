@@ -449,6 +449,14 @@ object Machine:
       else if Check.DeltaNetRuntimeRules.enabled(graph) then reduceIndependent(net, initial, graph)
       else reduceF7Oracle(net, initial, graph)
 
+    /**
+     * Run specifically through the F8 independent reducer, even when a newer
+     * graph also enables the F9 parallel scheduler. Differential checks use
+     * this entry point so their executor claim is explicit and stable.
+     */
+    def runIndependent(program: Vector[Instr], initial: State = State(), graph: Graph = Bootstrap.graph): Either[String, State] =
+      lower(program, graph).flatMap(net => reduceIndependent(net, initial, graph))
+
     /** F7 compatibility path retained only so predecessor-foundation tests remain executable. */
     private def reduceF7Oracle(net: Net, initial: State, graph: Graph): Either[String, State] =
       for
