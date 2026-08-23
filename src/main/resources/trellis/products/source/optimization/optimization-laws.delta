@@ -1,0 +1,57 @@
+delta-change "optimization-laws"
+message "add verified optimization laws"
+author "bootstrap"
+doc "guide" """
+  |# OptimizationLaws: law/proof-backed rewrites
+  |
+  |OptimizationLaws replaces opaque nonempty evidence with explicit graph proof objects.
+  |Each `optimization.law` binds exactly one rewrite identity and must match its
+  |lhs, rhs, structural mode, and preserved invariant set.
+  |
+  |Once the law policy exists, EGraphDerivation derivation admits only rules with verified
+  |laws. Mismatched claims, unknown rules, duplicate laws, and unsupported policy
+  |edits fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |OptimizationLaws.delta
+  |6ec25405fd99b5422ee948750dcce5a69762d513c6a639f374ce071b1b8fc477
+  |
+  |OptimizationLaws root
+  |daa6be93c75a659a62d35cd4186cbbc66ab10e3f84e0ffd6f03e7f2e3fa315c4
+  |
+  |680 nodes
+  |783 edges
+  |680 entities
+  |14 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "egraph-derivation"
+  assert "introduces" "optimization-laws.schema" "optimization.schema"
+depends "egraph-derivation"
+  entity "optimization-laws.schema" "optimization.schema"
+    attr "extends" "EGraphDerivation"
+    attr "feature" "law-proof-backed-rewrites"
+    attr "name" "OptimizationLaws"
+  components "optimization.component" "OptimizationLaws"
+    component "law" "Law"
+    component "verified-proof" "VerifiedProof"
+  rules "optimization.rule"
+    rule "exact-law-binding" "exact-law-binding" "bind-law-to-rewrite-identity"
+    rule "exact-invariant-proof" "exact-invariant-proof" "match-mode-and-preserved-invariants"
+  entity "optimization.law.policy" "optimization.law-policy"
+    attr "binding" "exact-rule"
+    attr "failure" "strict"
+    attr "invariants" "exact"
+    attr "mode" "exact"
+  entity "optimization.law.beta" "optimization.law"
+    attr "lhs" "beta-redex"
+    attr "mode" "unrestricted"
+    attr "preserves" "type;resource;effect;protocol"
+    attr "rhs" "beta-contract"
+    attr "rule" "optimization.rewrite.beta"
