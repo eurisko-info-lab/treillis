@@ -1,0 +1,68 @@
+delta-change "publication-ledger"
+message "add simulated publication ledger"
+author "bootstrap"
+doc "guide" """
+  |# PublicationLedger: simulated publication ledger
+  |
+  |PublicationLedger begins the global-network slice with a deterministic local ledger.
+  |Publications bind a package and branch to a canonical change frontier, graph
+  |root, publisher, and simulated signature. Their identities are SHA-256 hashes
+  |of the canonical publication encoding; the identifier is verified again at
+  |admission rather than trusted from the caller.
+  |
+  |Admission is graph-defined and fail-closed. The PublicationLedger graph selects
+  |append-only ordering, canonical identity, duplicate rejection, and the
+  |simulated-signature scheme. It also declares the `trellis` package namespace
+  |and admits `trellis-foundation` as its publisher. Unknown namespaces,
+  |unregistered publishers, malformed roots or frontiers, forged identities,
+  |unsupported policies, and duplicate records are rejected before the ledger is
+  |changed.
+  |
+  |This is intentionally not yet a distributed or cryptographically signed
+  |ledger. It establishes the canonical record and admission boundary that later
+  |network products can move behind distributed CAS, real publisher keys, and
+  |consensus without changing branch provenance.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |PublicationLedger.delta
+  |62c21c229bb84204804f62e95de684936dee99d033db6b13ee46278486169dae
+  |
+  |PublicationLedger root
+  |f504ea229ceb3e29a8c7316527722563954809727ac430dcf73a31326a4c4e79
+  |
+  |714 nodes
+  |783 edges
+  |714 entities
+  |12 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "differential-certificates"
+  assert "introduces" "publication-ledger.schema" "network.schema"
+depends "differential-certificates"
+  entity "publication-ledger.schema" "network.schema"
+    attr "extends" "DifferentialCertificates"
+    attr "feature" "simulated-publication-ledger"
+    attr "name" "PublicationLedger"
+  components "network.component" "PublicationLedger"
+    component "publication-ledger" "PublicationLedger"
+  entity "network.ledger.policy" "network.ledger-policy"
+    attr "duplicate" "reject"
+    attr "failure" "strict"
+    attr "identity" "canonical-sha256"
+    attr "ordering" "append-only"
+    attr "signature" "simulated"
+  entity "network.namespace.trellis" "network.namespace"
+    attr "prefix" "trellis"
+  entity "network.publisher.foundation" "network.publisher"
+    attr "name" "trellis-foundation"
+    attr "namespace" "trellis"
+  entity "network.package.bootstrap" "network.package"
+    attr "name" "trellis/bootstrap"
+    attr "namespace" "trellis"
