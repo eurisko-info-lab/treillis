@@ -1,0 +1,52 @@
+delta-change "interactive-svg"
+message "add interactive semantic SVG views"
+author "bootstrap"
+doc "guide" """
+  |# InteractiveSvg: interactive semantic SVG views
+  |
+  |InteractiveSvg turns SVG semantic marks into deterministic interaction targets. Selected
+  |renders emit keyboard focus, button roles, and `aria-selected` state directly on
+  |node and edge elements, while ordinary SVG remains byte-compatible with the F5
+  |projection oracle.
+  |
+  |The graph policy selects `select`/`activate` actions, semantic-target focus,
+  |ARIA selected state, and strict failure. SemanticSelection entity/node equivalence drives
+  |the same selected SVG target.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |InteractiveSvg.delta
+  |6818c2330fc2cd434d330a92355e85fc9f7844e5c5f8a80ba66ac5db0d316b51
+  |
+  |InteractiveSvg root
+  |e42699c937ba3a8b27e1b1e1e496443b49fea2b1b4ffa08d472d03645dcb204c
+  |
+  |643 nodes
+  |783 edges
+  |643 entities
+  |12 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "semantic-selection"
+  assert "introduces" "interactive-svg.schema" "studio.schema"
+depends "semantic-selection"
+  entity "interactive-svg.schema" "studio.schema"
+    attr "extends" "SemanticSelection"
+    attr "feature" "interactive-svg-views"
+    attr "name" "InteractiveSvg"
+  components "studio.component" "InteractiveSvg"
+    component "interaction-target" "InteractionTarget"
+    component "interactive-svg" "InteractiveSvg"
+  rules "studio.rule"
+    rule "svg-semantic-focus" "semantic-focus" "keyboard-focus-semantic-targets"
+    rule "svg-selected-state" "selected-state" "emit-aria-selected"
+  entity "studio.svg.interaction-policy" "studio.svg-interaction-policy"
+    attr "actions" "select;activate"
+    attr "failure" "strict"
+    attr "focus" "semantic-targets"
+    attr "selected-state" "aria-selected"
