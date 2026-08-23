@@ -4,7 +4,7 @@ author "bootstrap"
 doc "guide" """
   |# LspAdapter: semantic LSP adapter
   |
-  |LspAdapter completes the deferred Studio integration by adapting the semantic Code
+  |LspAdapter completes the deferred Squeak integration by adapting the semantic Code
   |View into a deterministic language-server document. The virtual document URI
   |binds the complete graph root, its text is the existing Code projection, and
   |its symbols map semantic entity identities to zero-based LSP positions.
@@ -20,15 +20,15 @@ test "canonical delta contract"
   assert "valid"
   assert "source-roundtrip"
   assert "dependency" "artifact-attestations"
-  assert "introduces" "lsp-adapter.schema" "studio.schema"
+  assert "introduces" "lsp-adapter.schema" "squeak.schema"
 depends "artifact-attestations"
-  entity "lsp-adapter.schema" "studio.schema"
+  entity "lsp-adapter.schema" "squeak.schema"
     attr "extends" "ArtifactAttestations"
     attr "feature" "lsp-adapter"
     attr "name" "LspAdapter"
-  components "studio.component" "LspAdapter"
+  components "squeak.component" "LspAdapter"
     component "lsp-adapter" "LspAdapter"
-  entity "studio.lsp.policy" "studio.lsp-policy"
+  entity "squeak.lsp.policy" "squeak.lsp-policy"
     attr "definition" "exact-anchor"
     attr "document" "code-view"
     attr "failure" "strict"

@@ -36,13 +36,13 @@ object Project:
     lspDocument(graph).flatMap(_.symbols.find(_.entity == entity).map(_.position).toRight(s"unknown LSP symbol ${entity.value}"))
 
   private def lspPolicy(graph: Graph): Either[String, Unit] =
-    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.lsp-policy").map(entity -> _) }
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "squeak.lsp-policy").map(entity -> _) }
     candidates match
       case Vector((entity, node)) =>
         val supported = node.attrs.get("document").contains("code-view") && node.attrs.get("positions").contains("zero-based-utf16") && node.attrs.get("symbols").contains("semantic-entities") && node.attrs.get("definition").contains("exact-anchor") && node.attrs.get("failure").contains("strict")
         Either.cond(supported, (), s"unsupported LSP policy ${entity.value}")
-      case Vector() => Left("missing Studio LSP policy")
-      case _ => Left("multiple Studio LSP policies")
+      case Vector() => Left("missing Squeak LSP policy")
+      case _ => Left("multiple Squeak LSP policies")
 
   def codePreview(graph: Graph, selection: Option[Selection] = None): Either[String, CodePreview] =
     for
@@ -64,7 +64,7 @@ object Project:
     yield preview
 
   private def codeViewPolicy(graph: Graph): Either[String, (Boolean, String)] =
-    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.code-view-policy").map(entity -> _) }
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "squeak.code-view-policy").map(entity -> _) }
     candidates match
       case Vector((entity, node)) =>
         for
@@ -74,8 +74,8 @@ object Project:
           failure <- node.attrs.get("failure").toRight(s"${entity.value} lacks failure")
           _ <- if lines == "one-based-semantic" && selection == "reveal" && failure == "strict" then Right(()) else Left(s"unsupported Code View policy ${entity.value}")
         yield enabled -> selection
-      case Vector() => Left("missing Studio Code View policy")
-      case _ => Left("multiple Studio Code View policies")
+      case Vector() => Left("missing Squeak Code View policy")
+      case _ => Left("multiple Squeak Code View policies")
 
   def reviewDelta(graph: Graph, change: Change): Either[String, DeltaReview] =
     for
@@ -85,13 +85,13 @@ object Project:
     yield DeltaReview(Change.id(change), change.message, change.author, Delta.footprint(change).toVector.sorted, entries, successor)
 
   private def reviewPolicy(graph: Graph): Either[String, Unit] =
-    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.delta-review-policy").map(entity -> _) }
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "squeak.delta-review-policy").map(entity -> _) }
     candidates match
       case Vector((entity, node)) =>
         val supported = node.attrs.get("order").contains("operation-order") && node.attrs.get("snapshots").contains("content-id") && node.attrs.get("impacts").contains("semantic-selection") && node.attrs.get("failure").contains("strict")
         Either.cond(supported, (), s"unsupported delta review policy ${entity.value}")
-      case Vector() => Left("missing Studio delta review policy")
-      case _ => Left("multiple Studio delta review policies")
+      case Vector() => Left("missing Squeak delta review policy")
+      case _ => Left("multiple Squeak delta review policies")
 
   private def reviewEntry(beforeGraph: Graph, afterGraph: Graph, operation: Op, index: Int): Either[String, ReviewEntry] = operation match
     case Op.AddNode(node) =>
@@ -130,7 +130,7 @@ object Project:
     yield TypstPreview(rendered, pages, anchors, selectedPage)
 
   private def previewPolicy(graph: Graph): Either[String, (Int, String)] =
-    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.typst-preview-policy").map(entity -> _) }
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "squeak.typst-preview-policy").map(entity -> _) }
     candidates match
       case Vector((entity, node)) =>
         for
@@ -140,8 +140,8 @@ object Project:
           failure <- node.attrs.get("failure").toRight(s"${entity.value} lacks failure")
           _ <- if pageSize > 0 && pageSize <= 256 && numbering == "one-based" && selection == "reveal" && failure == "strict" then Right(()) else Left(s"unsupported Typst preview policy ${entity.value}")
         yield pageSize -> selection
-      case Vector() => Left("missing Studio Typst preview policy")
-      case _ => Left("multiple Studio Typst preview policies")
+      case Vector() => Left("missing Squeak Typst preview policy")
+      case _ => Left("multiple Squeak Typst preview policies")
 
   def interactiveSvg(graph: Graph, selection: Selection, view: EntityId = EntityId("projection.svg")): Either[String, InteractiveSvg] =
     for
@@ -154,7 +154,7 @@ object Project:
     yield InteractiveSvg(rendered, targets)
 
   private def interactionPolicy(graph: Graph): Either[String, Vector[String]] =
-    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.svg-interaction-policy").map(entity -> _) }
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "squeak.svg-interaction-policy").map(entity -> _) }
     candidates match
       case Vector((entity, node)) =>
         for
@@ -165,8 +165,8 @@ object Project:
           decoded = actions.split(";", -1).toVector.filter(_.nonEmpty)
           _ <- if decoded == Vector("select", "activate") && focus == "semantic-targets" && selected == "aria-selected" && failure == "strict" then Right(()) else Left(s"unsupported SVG interaction policy ${entity.value}")
         yield decoded
-      case Vector() => Left("missing Studio SVG interaction policy")
-      case _ => Left("multiple Studio SVG interaction policies")
+      case Vector() => Left("missing Squeak SVG interaction policy")
+      case _ => Left("multiple Squeak SVG interaction policies")
 
   def synchronizeSelection(graph: Graph, selection: Selection): Either[String, Vector[SynchronizedView]] =
     for
@@ -182,7 +182,7 @@ object Project:
     yield views
 
   private def selectionPolicy(graph: Graph): Either[String, (Vector[EntityId], String)] =
-    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "studio.selection-policy").map(entity -> _) }
+    val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) => graph.nodes.get(id).filter(_.kind == "squeak.selection-policy").map(entity -> _) }
     candidates match
       case Vector((entity, node)) =>
         for
@@ -194,8 +194,8 @@ object Project:
           _ <- if decoded.nonEmpty && identity == "entity-node-equivalence" && Set("allow-hidden", "require-visible").contains(visibility) && failure == "strict" then Right(()) else Left(s"unsupported selection policy ${entity.value}")
           _ <- sequence(decoded.map(view => ProjectionRules.view(graph, view).map(_ => ()))).map(_ => ())
         yield decoded -> visibility
-      case Vector() => Left("missing Studio selection policy")
-      case _ => Left("multiple Studio selection policies")
+      case Vector() => Left("missing Squeak selection policy")
+      case _ => Left("multiple Squeak selection policies")
 
   private def equivalentSelectionKeys(graph: Graph, selection: Selection): Either[String, Set[String]] = selection match
     case Selection.Entity(entity) => graph.entities.get(entity).toRight(s"unknown entity ${entity.value}").map(node => Set(Navigate.selectionKey(selection), Navigate.selectionKey(Selection.Node(node))))

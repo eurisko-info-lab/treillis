@@ -1,6 +1,6 @@
-delta-package studio.navigation
+delta-package squeak.navigation
   purpose semantic navigator protocol
   requires language.trellis.lowering
-  provides studio.navigation
-  include source/studio/studio-navigator.delta
+  provides squeak.navigation
+  include source/squeak/squeak-navigator.delta
     post-action validate-graph

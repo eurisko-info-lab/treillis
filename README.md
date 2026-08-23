@@ -59,3 +59,5 @@ The bootstrap demonstrates the architectural seam, not a complete language imple
 - SVG and Typst as projections with semantic IDs.
 
 See `docs/` for the tutorial, specification, bootstrap contract, and next milestones.
+The Squeak-like live graph image and assembly model are described in
+[`docs/ASSEMBLIES.md`](docs/ASSEMBLIES.md).

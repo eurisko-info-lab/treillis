@@ -17,7 +17,7 @@ The local branch initially contains the same semantic graph as `F`. Local AI wor
 
 ## 2. Navigate semantics, not files
 
-A selection is an entity, immutable node, edge, change, branch, or publication. From an entity such as `app/analyze`, Studio can navigate to its content, callers, capability edges, history, origin publication, proof dependencies, or execution projection.
+A selection is an entity, immutable node, edge, change, branch, or publication. From an entity such as `app/analyze`, Squeak can navigate to its content, callers, capability edges, history, origin publication, proof dependencies, or execution projection.
 
 The bootstrap exposes this through `Navigate.Selection` and `Navigate.neighborhood`.
 

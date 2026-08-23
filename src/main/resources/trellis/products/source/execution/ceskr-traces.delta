@@ -14,7 +14,7 @@ doc "guide" """
   |transition equality.
   |
   |`trace.bool0.policy` selects `canonical-v1`, zero-based contiguous indices,
-  |entity identity, and strict failure. CeskrTraces completes roadmap Slice C; Studio
+  |entity identity, and strict failure. CeskrTraces completes roadmap Slice C; Squeak
   |work begins with the next layer.
   |
   """

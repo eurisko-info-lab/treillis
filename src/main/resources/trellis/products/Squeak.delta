@@ -1,0 +1,14 @@
+delta-package squeak.core
+  purpose navigation synchronized views previews and review
+  requires squeak.navigation
+  provides squeak.core
+  include source/squeak/semantic-selection.delta
+    post-action validate-graph
+  include source/squeak/interactive-svg.delta
+    post-action validate-graph
+  include source/squeak/typst-preview.delta
+    post-action validate-graph
+  include source/squeak/delta-review.delta
+    post-action validate-graph
+  include source/squeak/code-view.delta
+    post-action validate-graph

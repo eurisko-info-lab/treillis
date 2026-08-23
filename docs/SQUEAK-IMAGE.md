@@ -1,6 +1,6 @@
-# Studio spatial syntax
+# Squeak spatial syntax
 
-Studio presents Trellis objects as one structured space rather than parallel
+Squeak presents Trellis objects as one structured space rather than parallel
 text and graph documents. Text is the dense glyph for a semantic subgraph;
 containers, boundary ports, and wires expose structure that text normally
 hides.
@@ -26,7 +26,7 @@ language. Editing an expression rewires its semantic subgraph; rewiring a port
 rewrites the expression's textual glyph. Neither presentation is a second
 source of truth.
 
-The first Studio implementation renders the Fibonacci workspace with function
+The first Squeak implementation renders the Fibonacci workspace with function
 and nested-function containers, boundary ports, pattern regions, textual
 expressions, and reference/result wires. The `IR` tab remains a diagnostic
 projection and `Typst` remains an export projection.
@@ -45,9 +45,9 @@ trampoline. CESK-R evaluates strictly left-to-right and records a debug trace of
 control, environment, continuation depth, and resource domain for every
 reduction. Both must return the same observable Nat.
 
-Studio reaches the Scala engines through the loopback Studio execution
+Squeak reaches the Scala engines through the loopback Squeak execution
 service; the Rust delta browser only proxies the request. The browser contains
-no evaluator. Start both services with `scripts/run-studio.sh`.
+no evaluator. Start both services with `scripts/run-squeak.sh`.
 
 ## Layout stress cases
 

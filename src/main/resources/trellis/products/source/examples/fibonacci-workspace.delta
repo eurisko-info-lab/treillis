@@ -6,12 +6,12 @@ doc "guide" """
   |
   |FibonacciWorkspace adds a searchable Fibonacci workspace node connected to its complete
   |IR graph. Searching selects the node and offers an explicit Open Workspace
-  |action. Studio then traverses outgoing semantic edges and generates the Graph,
+  |action. Squeak then traverses outgoing semantic edges and generates the Graph,
   |pretty-printed Trellis, UML-like SVG, and Typst source views in memory.
   |
   |The reachable graph has a node for every function, parameter, match, case,
   |pattern, reference, constructor, call, and binary operation in the definition.
-  |The Studio host contains no Fibonacci-specific behavior and no pre-generated
+  |The Squeak host contains no Fibonacci-specific behavior and no pre-generated
   |projection files are required. Attributes can optionally be expanded as
   |`core.attribute` leaf nodes in the Graph and SVG workspace views.
   |

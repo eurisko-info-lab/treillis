@@ -1,6 +1,6 @@
 delta-package optimization.core
   purpose equality saturation extraction and executable lowering
-  requires studio.core
+  requires squeak.core
   requires language.trellis.lowering
   provides optimization.core
   include source/optimization/egraph-derivation.delta

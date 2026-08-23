@@ -105,4 +105,4 @@ The bootstrap intentionally leaves these for subsequent slices:
 - DeltaNet lowering/runtime;
 - real global blockchain consensus;
 - cryptographic publisher identities;
-- native Trellis Studio.
+- native Trellis Squeak.

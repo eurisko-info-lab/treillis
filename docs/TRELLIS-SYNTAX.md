@@ -1,7 +1,7 @@
 # Trellis concrete syntax
 
 Trellis now has a concrete source grammar and AST rather than relying on the
-Studio's pretty-printer as an implicit language definition.
+Squeak's pretty-printer as an implicit language definition.
 
 The grammar is data: token punctuation, keywords, categories, constructors,
 and their element sequences live in `TrellisLanguage.grammar`. One generic lexer

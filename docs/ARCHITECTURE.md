@@ -41,7 +41,7 @@ dispatch. Source-language ASTs are not execution IR.
 
 `trellis.engine.ExecutionEngine` is the common execution contract.
 `DeltaNetEngine` and `CeskrEngine` advertise accepted IR versions and return the
-same engine-neutral result shape. The Studio runtime resolves engines through
+same engine-neutral result shape. The Squeak runtime resolves engines through
 `Engines`, not through syntax, `Machine`, or `Language` objects.
 
 ## Product assembly

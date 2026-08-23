@@ -25,7 +25,7 @@ capability is recorded explicitly as basis-provided in the production lock.
 CeskrTransitions, CeskrTraces, and DifferentialCertificates. `SelectionCompiler` deterministically
 reissues selected operations over the selected predecessor frontier, validates
 every intermediate graph, and records every source-ID to compiled-ID derivation.
-The resulting graph contains StudioNavigator, Studio runtime, storage, and Fibonacci
+The resulting graph contains SqueakNavigator, Squeak runtime, storage, and Fibonacci
 while physically excluding CESK-R, trace, and differential-certificate nodes.
 Replaying the compiled lock reproduces its graph root.
 
@@ -116,7 +116,7 @@ selection requires orthogonal fragments instead:
 - Trellis syntax and lowering;
 - DeltaNet execution;
 - CESK-R execution and tracing;
-- Studio navigation;
+- Squeak navigation;
 - debugger UI;
 - examples.
 

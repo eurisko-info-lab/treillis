@@ -102,5 +102,23 @@ object RepositoryProductsTest:
       val (s1, aid) = Store().put(a)
       val (s2, bid) = s1.put(b)
       check(materialize(s2, Branch(BranchId("t"), Bootstrap.graph, Set(aid, bid), None)).isLeft)
+    }),
+    Test("Squeak workspace previews an open delta and seals it as one immutable change", () => {
+      val branchId = BranchId("squeak/transcript")
+      val initial = Store().addBranch(Branch(branchId, Bootstrap.graph, Set.empty, None))
+      val opened = editWorkspace(
+        WorkspaceSession(branchId),
+        Op.ReplaceEntity(EntityId("workspace.scratch"), Node("app.function", attrs = Map("source" -> "42"))),
+        "workspace.scratch := 42"
+      )
+      check(opened.isDirty)
+      check(right(previewWorkspace(initial, opened)).entities.contains(EntityId("workspace.scratch")))
+      check(!initial.branches(branchId).basis.entities.contains(EntityId("workspace.scratch")))
+
+      val committed = right(commitWorkspace(initial, opened, "define scratch method"))
+      check(!committed.session.isDirty)
+      check(committed.graph.entities.contains(EntityId("workspace.scratch")))
+      check(committed.store.changes.contains(committed.changeId))
+      check(commitWorkspace(committed.store, committed.session, "empty").isLeft)
     })
   )

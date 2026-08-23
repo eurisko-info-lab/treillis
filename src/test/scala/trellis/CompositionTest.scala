@@ -164,7 +164,7 @@ object CompositionTest:
     }),
     Test("resource-backed full profile resolves every current product fragment", () => {
       val lock = right(CompositionCatalog.resolve("full"))
-      equal(lock.packages, Vector("common.lambda", "language.trellis", "execution.ceskr", "studio.navigation", "studio.core", "optimization.core", "optimization.differential", "storage.network", "studio.runtime", "example.fibonacci"))
+      equal(lock.packages, Vector("common.lambda", "language.trellis", "execution.ceskr", "squeak.navigation", "squeak.core", "optimization.core", "optimization.differential", "storage.network", "squeak.runtime", "example.fibonacci"))
       check(ProductCatalog.products.map(_.changeId).toSet.subsetOf(lock.fragments.map(_.changeId).toSet))
       equal(lock.fragments.size, ProductCatalog.products.size + 1)
     }),
@@ -179,7 +179,7 @@ object CompositionTest:
       check(result.graph.entities.contains(EntityId("deltanet.policy.parallel")))
       check(!result.graph.entities.contains(EntityId("ceskr-transitions.schema")))
       check(!result.graph.entities.contains(EntityId("ceskr-traces.schema")))
-      check(!result.graph.entities.contains(EntityId("studio-navigator.schema")))
+      check(!result.graph.entities.contains(EntityId("squeak-navigator.schema")))
       equal(result.applied.size, 17)
     }),
     Test("resource debug profile adds actual CESK-R and trace changes", () => {
@@ -187,7 +187,7 @@ object CompositionTest:
       check(result.graph.entities.contains(EntityId("ceskr-transitions.schema")))
       check(result.graph.entities.contains(EntityId("ceskr-traces.schema")))
       check(result.graph.entities.contains(EntityId("common.lambda.term.application")))
-      check(!result.graph.entities.contains(EntityId("studio-navigator.schema")))
+      check(!result.graph.entities.contains(EntityId("squeak-navigator.schema")))
       equal(result.applied.size, 19)
     }),
     Test("production IDE compiles later actual fragments over a debugger-free frontier", () => {
@@ -196,7 +196,7 @@ object CompositionTest:
         if errors.isEmpty then Right(()) else Left(errors.mkString("; "))
       })
       val compiled = right(CompositionCatalog.compile("production-ide", Bootstrap.graph, Set(ChangeId(Bootstrap.F11ChangeId)), validating))
-      check(compiled.graph.entities.contains(EntityId("studio-navigator.schema")))
+      check(compiled.graph.entities.contains(EntityId("squeak-navigator.schema")))
       check(compiled.graph.entities.contains(EntityId("lsp-adapter.schema")))
       check(compiled.graph.entities.contains(EntityId("example.tailrec.fibonacci")))
       check(compiled.graph.entities.contains(EntityId("common.lambda.schema")))

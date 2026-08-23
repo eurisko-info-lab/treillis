@@ -1,0 +1,6 @@
+delta-package squeak.runtime
+  purpose LSP and runtime UI
+  requires storage.network
+  provides squeak.runtime
+  include source/squeak/lsp-adapter.delta
+    post-action validate-graph

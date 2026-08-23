@@ -9,8 +9,8 @@ Post-foundation products are organized as readable capability packages:
 - `Optimize.delta` — optimization and executable lowering;
 - `OptimizeDifferential.delta` — optional CESK-R/DeltaNet differential certification;
 - `Storage.delta` — publication, CAS, consensus, discovery, and attestation;
-- `Studio.delta` — navigation, projections, and review;
-- `StudioRuntime.delta` — LSP and runtime UI after storage is available;
+- `Squeak.delta` — navigation, projections, and review;
+- `SqueakRuntime.delta` — LSP and runtime UI after storage is available;
 - `Fibonacci.delta` — one worked example.
 
 The format is intentionally small and canonical:
@@ -75,7 +75,7 @@ doc "guide" """
 ```
 
 `doc` values survive semantic parse/print round-trips and are available to
-Studio tooling.
+Squeak tooling.
 The generic delta-test interpreter executes every indented assertion without a
 product-name switch. Supported contracts cover canonical replay,
 constitutional validity, source round-tripping, dependencies, and introduced

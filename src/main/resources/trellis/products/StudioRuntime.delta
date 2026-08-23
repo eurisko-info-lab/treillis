@@ -1,6 +1,0 @@
-delta-package studio.runtime
-  purpose LSP and runtime UI
-  requires storage.network
-  provides studio.runtime
-  include source/studio/lsp-adapter.delta
-    post-action validate-graph

@@ -5,7 +5,7 @@ doc "guide" """
   |# CodeView: optional semantic Code View
   |
   |CodeView wraps the existing noncanonical Code projection in an explicit optional
-  |Studio contract. Graph policy controls enablement, one-based semantic line
+  |Squeak contract. Graph policy controls enablement, one-based semantic line
   |anchors, selection reveal, and strict failure.
   |
   |Disabling the preview does not change projection data. When enabled, SemanticSelection
@@ -18,19 +18,19 @@ test "canonical delta contract"
   assert "valid"
   assert "source-roundtrip"
   assert "dependency" "delta-review"
-  assert "introduces" "code-view.schema" "studio.schema"
+  assert "introduces" "code-view.schema" "squeak.schema"
 depends "delta-review"
-  entity "code-view.schema" "studio.schema"
+  entity "code-view.schema" "squeak.schema"
     attr "extends" "DeltaReview"
     attr "feature" "optional-semantic-code-view"
     attr "name" "CodeView"
-  components "studio.component" "CodeView"
+  components "squeak.component" "CodeView"
     component "code-preview" "CodePreview"
     component "code-anchor" "CodeAnchor"
-  rules "studio.rule"
+  rules "squeak.rule"
     rule "code-optionality" "optionality" "enable-or-disable-code-preview"
     rule "code-selection-reveal" "selection-reveal" "map-selection-to-line"
-  entity "studio.code.view-policy" "studio.code-view-policy"
+  entity "squeak.code.view-policy" "squeak.code-view-policy"
     attr "enabled" "true"
     attr "failure" "strict"
     attr "lines" "one-based-semantic"

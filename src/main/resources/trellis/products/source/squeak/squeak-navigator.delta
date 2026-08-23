@@ -1,10 +1,10 @@
-delta-change "studio-navigator"
-message "add deterministic Studio graph navigator"
+delta-change "squeak-navigator"
+message "add deterministic Squeak graph navigator"
 author "bootstrap"
 doc "guide" """
-  |# StudioNavigator: deterministic Studio graph navigator
+  |# SqueakNavigator: deterministic Squeak graph navigator
   |
-  |StudioNavigator begins roadmap Slice D with a semantic graph navigator independent of
+  |SqueakNavigator begins roadmap Slice D with a semantic graph navigator independent of
   |files and text offsets. A graph-selected policy controls breadth-first traversal,
   |relation/identity ordering, semantic-key deduplication, strict failure, depth,
   |and result bounds.
@@ -24,18 +24,18 @@ depends "ceskr-traces"
   entity "graph-navigation.schema" "grammar.schema"
     attr "extends" "CeskrTraces"
     attr "name" "GraphNavigation"
-    attr "purpose" "studio-graph-navigator"
-  entity "studio-navigator.schema" "studio.schema"
+    attr "purpose" "squeak-graph-navigator"
+  entity "squeak-navigator.schema" "squeak.schema"
     attr "feature" "graph-navigator"
-    attr "name" "StudioNavigator"
-  components "studio.component" "StudioNavigator"
+    attr "name" "SqueakNavigator"
+  components "squeak.component" "SqueakNavigator"
     component "navigator" "Navigator"
     component "selection" "Selection"
     component "neighborhood" "Neighborhood"
-  rules "studio.rule"
+  rules "squeak.rule"
     rule "navigator-breadth-first" "breadth-first" "visit-by-depth"
     rule "navigator-semantic-identity" "semantic-identity" "deduplicate-selection-keys"
-  entity "studio.navigator.policy" "studio.navigator-policy"
+  entity "squeak.navigator.policy" "squeak.navigator-policy"
     attr "failure" "strict"
     attr "identity" "semantic"
     attr "max-depth" "2"

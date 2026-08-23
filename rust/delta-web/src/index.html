@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Trellis Studio</title>
+<title>Trellis Squeak</title>
 <link rel="icon" href="data:,">
 <style>
   :root {
@@ -136,13 +136,18 @@
   .diff-add { color: var(--ok); }
   .diff-rm { color: var(--bad); }
   .diff-chg { color: #e0b661; }
+  .transcript { display:grid; grid-template-rows:auto 1fr auto; width:100%; background:#f3edcf; color:#202018; }
+  .transcript-status { padding:8px 12px; border-bottom:1px solid #b8ad7e; font:12px ui-monospace,monospace; }
+  .transcript textarea { resize:none; border:0; outline:0; padding:18px; background:#fffbea; color:#202018; font:15px/1.5 ui-monospace,monospace; }
+  .transcript-tools { display:flex; gap:7px; padding:9px 12px; border-top:1px solid #b8ad7e; }
+  .transcript-tools input { flex:1; min-width:110px; }
   ul.plain { list-style: none; margin: 0; padding: 0; font-size: 12px; }
   ul.plain li { padding: 2px 0; font-family: ui-monospace, monospace; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Trellis Studio</h1>
+  <h1>Trellis Squeak</h1>
   <span class="path" id="resources-path"></span>
   <div class="spacer"></div>
   <span id="status"></span>
@@ -160,8 +165,9 @@
     <section id="example-workspace">
       <div class="workspace-head">
         <span id="workspace-breadcrumbs" class="workspace-breadcrumbs"></span>
-        <span class="title">Semantic workspace</span>
-        <button class="workspace-tab active" data-pane="graph-pane">Spatial</button>
+        <span class="title">System Browser</span>
+        <button class="workspace-tab active" data-pane="graph-pane">Browser</button>
+        <button class="workspace-tab" data-pane="transcript-pane">Transcript</button>
         <button class="workspace-tab" data-pane="lab-pane">Layout lab</button>
         <button class="workspace-tab" data-pane="svg-pane">IR</button>
         <button class="workspace-tab" data-pane="typst-pane">Typst</button>
@@ -177,6 +183,18 @@
         <button id="close-example">Back to graph</button>
       </div>
       <div id="graph-pane" class="workspace-pane active"><svg id="workspace-graph" class="live-diagram"></svg></div>
+      <div id="transcript-pane" class="workspace-pane"><div class="transcript">
+        <div id="transcript-status" class="transcript-status">Connecting to image…</div>
+        <textarea id="transcript-source" spellcheck="false">42</textarea>
+        <div class="transcript-tools">
+          <input id="transcript-entity" value="workspace.scratch" aria-label="Entity">
+          <input id="transcript-kind" value="app.function" aria-label="Kind">
+          <button id="transcript-doit">Do it</button>
+          <input id="transcript-message" value="Squeak transcript change" aria-label="Commit message">
+          <button id="transcript-commit">Commit</button>
+          <button id="transcript-publish">Publish</button>
+        </div>
+      </div></div>
       <div id="lab-pane" class="workspace-pane"><div id="spatial-lab" class="spatial-lab"></div></div>
       <div id="svg-pane" class="workspace-pane"><svg id="workspace-svg" class="live-diagram"></svg></div>
       <div id="typst-pane" class="workspace-pane"><pre id="workspace-typst" class="workspace-code"></pre></div>
@@ -472,7 +490,7 @@ function colorFor(ns) {
 async function loadChain() {
   document.getElementById("status").textContent = "loading...";
   try {
-    const res = await fetch("/api/chain", { cache: "no-store" });
+    const res = await fetch("/api/workspace/graph", { cache: "no-store" });
     chainData = await res.json();
     document.getElementById("status").textContent =
       `${chainData.layers.length} layers` +
@@ -971,6 +989,55 @@ function jumpToOp(op) {
   }
 }
 
+async function imageRequest(path, params = {}) {
+  const response = await fetch(path + "?" + new URLSearchParams(params));
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || `image request failed (${response.status})`);
+  return body;
+}
+
+async function refreshTranscript() {
+  const status = document.getElementById("transcript-status");
+  try {
+    const image = await imageRequest("/api/workspace/status");
+    const state = image.dirty ? `${image.openOperations} open operation(s)` : "clean";
+    const history = image.transcript.length ? ` · ${image.transcript.join(" · ")}` : "";
+    status.textContent = `${image.assembly} · ${image.branch} · ${state} · ${image.closedChanges} closed change(s)${history}`;
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+document.getElementById("transcript-doit").onclick = async () => {
+  const status = document.getElementById("transcript-status");
+  try {
+    await imageRequest("/api/workspace/edit", {
+      entity: document.getElementById("transcript-entity").value,
+      kind: document.getElementById("transcript-kind").value,
+      source: document.getElementById("transcript-source").value
+    });
+    await refreshTranscript();
+  } catch (error) { status.textContent = error.message; }
+};
+
+document.getElementById("transcript-commit").onclick = async () => {
+  const status = document.getElementById("transcript-status");
+  try {
+    const result = await imageRequest("/api/workspace/commit", {message: document.getElementById("transcript-message").value});
+    await refreshTranscript();
+    status.textContent += ` · sealed ${result.change.slice(0, 12)}`;
+  } catch (error) { status.textContent = error.message; }
+};
+
+document.getElementById("transcript-publish").onclick = async () => {
+  const status = document.getElementById("transcript-status");
+  try {
+    const result = await imageRequest("/api/workspace/publish");
+    await refreshTranscript();
+    status.textContent += ` · published ${result.publication.slice(0, 12)}`;
+  } catch (error) { status.textContent = error.message; }
+};
+
 document.getElementById("reload").onclick = loadChain;
 document.addEventListener("keydown", ev => {
   if (document.activeElement === document.getElementById("search")) return;
@@ -980,6 +1047,7 @@ document.addEventListener("keydown", ev => {
 
 resizeCanvas();
 loadChain();
+refreshTranscript();
 </script>
 </body>
 </html>

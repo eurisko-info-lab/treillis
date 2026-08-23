@@ -50,7 +50,7 @@ object Navigate:
 
   private def navigatorPolicy(graph: Graph): Either[String, NavigatorPolicy] =
     val candidates = graph.entities.toVector.sortBy(_._1.value).flatMap { case (entity, id) =>
-      graph.nodes.get(id).filter(_.kind == "studio.navigator-policy").map(entity -> _)
+      graph.nodes.get(id).filter(_.kind == "squeak.navigator-policy").map(entity -> _)
     }
     candidates match
       case Vector((entity, node)) =>
@@ -63,8 +63,8 @@ object Navigate:
           maxResults <- node.attrs.get("max-results").flatMap(_.toIntOption).toRight(s"${entity.value} lacks integer max-results")
           _ <- if order == "relation-then-identity" && traversal == "breadth-first" && identity == "semantic" && failure == "strict" && maxDepth >= 0 && maxDepth <= 16 && maxResults > 0 && maxResults <= 4096 then Right(()) else Left(s"unsupported navigator policy ${entity.value}")
         yield NavigatorPolicy(entity, order, traversal, identity, failure, maxDepth, maxResults)
-      case Vector() => Left("missing Studio navigator policy")
-      case _ => Left("multiple Studio navigator policies")
+      case Vector() => Left("missing Squeak navigator policy")
+      case _ => Left("multiple Squeak navigator policies")
 
   private def selectionExists(graph: Graph, selection: Selection): Either[String, Unit] = selection match
     case Selection.Entity(id) => Either.cond(graph.entities.contains(id), (), s"unknown entity ${id.value}")

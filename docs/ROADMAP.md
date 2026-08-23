@@ -24,7 +24,7 @@
 - CESK-R transitions generated/interpreted from graph rules;
 - deterministic trace format.
 
-## Slice D — Trellis Studio
+## Slice D — Trellis Squeak
 
 - graph navigator;
 - synchronized semantic selection;
@@ -40,7 +40,7 @@ and exact definition locations over the Code View.
 ## Slice G — worked semantic examples
 
 FibonacciWorkspace begins a worked-example layer with accumulator-style tail recursion
-and focused SVG and Typst projections. The Studio shell now brings the readable
+and focused SVG and Typst projections. The Squeak shell now brings the readable
 Fibonacci definition and both rendered projections into one tabbed workspace.
 
 ## Slice E — optimization and execution
@@ -70,7 +70,7 @@ reproducible builders and signed artifact attestations over verified CAS bytes.
 
 ## Slice G — worked semantic examples
 
-FibonacciWorkspace begins with accumulator-style Fibonacci. Studio discovers its
+FibonacciWorkspace begins with accumulator-style Fibonacci. Squeak discovers its
 workspace node through ordinary search, traverses the reachable graph on
 demand, and generates Graph, Trellis, UML-like SVG, and Typst views live from
 semantic data.

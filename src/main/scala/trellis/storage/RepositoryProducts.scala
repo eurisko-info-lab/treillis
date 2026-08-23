@@ -97,6 +97,58 @@ object RepositoryProducts:
 
   final case class Materialized(graph: Graph, applied: Vector[ChangeId])
 
+  /** A Squeak-like live workspace: closed changes live on the branch; edits stay in one mutable transcript delta. */
+  final case class WorkspaceSession(
+      branch: BranchId,
+      operations: Vector[Op] = Vector.empty,
+      transcript: Vector[String] = Vector.empty,
+      author: String = "squeak"
+  ):
+    def isDirty: Boolean = operations.nonEmpty
+
+  final case class WorkspaceCommit(store: Store, session: WorkspaceSession, changeId: ChangeId, graph: Graph)
+
+  def editWorkspace(session: WorkspaceSession, operation: Op, transcriptEntry: String): WorkspaceSession =
+    session.copy(operations = session.operations :+ operation, transcript = session.transcript :+ transcriptEntry)
+
+  def previewWorkspace(store: Store, session: WorkspaceSession): Either[String, Graph] =
+    for
+      branch <- store.branches.get(session.branch).toRight(s"unknown branch ${session.branch.value}")
+      closed <- materialize(store, branch)
+      preview <- Delta.applyChange(closed.graph, Change(branch.frontier, session.operations, "open workspace delta", session.author))
+    yield preview
+
+  def commitWorkspace(store: Store, session: WorkspaceSession, message: String): Either[String, WorkspaceCommit] =
+    for
+      _ <- Either.cond(session.operations.nonEmpty, (), "workspace delta is empty")
+      _ <- Either.cond(message.trim.nonEmpty, (), "workspace commit message is empty")
+      branch <- store.branches.get(session.branch).toRight(s"unknown branch ${session.branch.value}")
+      change = Change(branch.frontier, session.operations, message.trim, session.author)
+      nextStore <- advance(store, session.branch, change)
+      nextBranch = nextStore.branches(session.branch)
+      materialized <- materialize(nextStore, nextBranch)
+      id = Change.id(change)
+      clean = session.copy(operations = Vector.empty, transcript = session.transcript :+ s"committed ${id.value}")
+    yield WorkspaceCommit(nextStore, clean, id, materialized.graph)
+
+  def publishWorkspace(
+      graph: Graph,
+      ledger: Ledger,
+      store: Store,
+      session: WorkspaceSession,
+      packageName: String,
+      centralBranch: String,
+      publisher: String,
+      signature: String = "simulated"
+  ): Either[String, (Ledger, Publication)] =
+    for
+      _ <- Either.cond(!session.isDirty, (), "commit the open workspace delta before publishing")
+      branch <- store.branches.get(session.branch).toRight(s"unknown branch ${session.branch.value}")
+      materialized <- materialize(store, branch)
+      publication = makePublication(packageName, centralBranch, branch.frontier, Canon.graphId(materialized.graph), publisher, signature)
+      nextLedger <- publish(graph, ledger, publication)
+    yield nextLedger -> publication
+
   def encodePublication(publication: Publication): String =
     Canon.record(
       "publication",
