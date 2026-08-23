@@ -1,0 +1,213 @@
+delta-change "async-processes"
+message "add graph-defined processes and asynchronous channels"
+author "bootstrap"
+doc "guide" """
+  |# AsyncProcesses: processes and asynchronous channels
+  |
+  |AsyncProcesses is a post-constitution product delta layered over LambdaMatchSemantics. It does
+  |not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Purpose
+  |
+  |LambdaMatchSemantics introduces graph-defined expression semantics. AsyncProcesses adds the next
+  |reference-language layer: language-owned process programs that execute through
+  |the existing graph-dispatched resource/process machine.
+  |
+  |The division of responsibility is explicit:
+  |
+  |```text
+  |AsyncProcesses graph  -> process policy + ordered language instructions
+  |Machine.scala    -> trusted queue, ownership, blocking, and wake primitives
+  |F3/F4 graph      -> resource/process dispositions and primitive dispatch
+  |```
+  |
+  |Session protocols, generated CESK-R transition graphs, and a canonical trace
+  |format remain later layers.
+  |
+  |## Process programs
+  |
+  |A process program owns canonical `step01`, `step02`, ... references. AsyncProcesses
+  |decodes these entities into the existing machine instruction vocabulary:
+  |
+  |```text
+  |alloc
+  |new-channel
+  |spawn
+  |send
+  |receive
+  |terminate
+  |join
+  |```
+  |
+  |Programs must be non-empty, contiguous, language-owned, and within the selected
+  |step bound. Unknown instruction kinds and malformed attributes fail closed.
+  |
+  |## Asynchronous FIFO channels
+  |
+  |`process.bool0.policy` selects:
+  |
+  |```text
+  |scheduling    = program-order
+  |channel-order = fifo
+  |send          = asynchronous
+  |receive       = block-or-deliver
+  |failure       = strict
+  |max-steps     = 256
+  |```
+  |
+  |An asynchronous send either enqueues a resource or delivers it directly to the
+  |oldest blocked receiver. The sender does not block. Receive dequeues the oldest
+  |message when available; otherwise it records the receiver as blocked.
+  |
+  |Unsupported scheduling, LIFO channels, synchronous send, alternate receive
+  |behavior, and invalid bounds are rejected before execution.
+  |
+  |## Ownership
+  |
+  |AsyncProcesses does not duplicate resource semantics. It lowers graph instructions
+  |to `Machine.Instr`, and the foundation graph continues to select how resources
+  |move according to their mode.
+  |
+  |The frozen witness allocates an affine `job`, creates `jobs`, spawns `worker`,
+  |sends the job, and receives it in the worker. The final owner is therefore:
+  |
+  |```text
+  |Owner.Process("worker")
+  |```
+  |
+  |Unrestricted resources retain shared sender access, while affine and linear
+  |resources transfer according to the already frozen process rules.
+  |
+  |## Blocking and wake-up
+  |
+  |The second frozen witness receives before sending:
+  |
+  |```text
+  |new jobs
+  |spawn worker
+  |worker receives jobs  -> worker blocks
+  |allocate job
+  |send job              -> worker wakes and owns job
+  |```
+  |
+  |AsyncProcesses admission executes both witnesses, so a product edit that breaks
+  |queue delivery, blocking, wake-up, or ownership transfer fails graph validation.
+  |
+  |## Graph-defined rules
+  |
+  |The product graph names the interpreted behavior explicitly:
+  |
+  |```text
+  |semantics.rule.spawn-process
+  |semantics.rule.channel-fifo
+  |semantics.rule.send-asynchronous
+  |semantics.rule.receive-block
+  |semantics.rule.receive-wake
+  |```
+  |
+  |These layer-specific rule identities complement rather than replace the generic
+  |F3 process dispositions and F4 machine dispatch rules.
+  |
+  |## Grammar compatibility
+  |
+  |AsyncProcesses does not alter textual syntax, expression evaluation, modules, names,
+  |or recovery. LambdaMatchSemantics expressions and ModuleNameResolution source remain observationally
+  |identical. Process programs are semantic graph entities interpreted separately.
+  |
+  |## Invariants
+  |
+  |AsyncProcesses tests enforce:
+  |
+  |1. canonical LambdaMatchSemantics + AsyncProcesses.delta derivation,
+  |2. first-class process/channel/program/policy/rule vocabulary,
+  |3. asynchronous FIFO ownership transfer,
+  |4. empty receive blocking and later send wake-up,
+  |5. rejection of unsupported policies and malformed programs,
+  |6. successful execution of both frozen Bool0 witnesses during admission,
+  |7. LambdaMatchSemantics expression and parsing behavior remains identical,
+  |8. AsyncProcesses remains outside F0-F11 and all earlier product identities.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |AsyncProcesses.delta
+  |7dbd59a1210f08e26b2596318391550a676c81ac382eeca3d8a2458031fd3a10
+  |
+  |AsyncProcesses root
+  |92b457e15900ea4889792c5d1fc474e1f7685d98ee917ad4c450cbaf2653502f
+  |
+  |578 nodes
+  |783 edges
+  |578 entities
+  |40 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "lambda-match-semantics"
+  assert "introduces" "async-processes.schema" "grammar.schema"
+depends "lambda-match-semantics"
+  entity "async-processes.schema" "grammar.schema"
+    attr "extends" "LambdaMatchSemantics"
+    attr "name" "AsyncProcesses"
+    attr "purpose" "process-and-asynchronous-channel-semantics"
+  entity "process14.schema" "process.schema"
+    attr "channel-order" "fifo"
+    attr "name" "Process14"
+    attr "send" "asynchronous"
+  components "language.component" "AsyncProcesses"
+    component "process-program" "ProcessProgram"
+  components "semantics.component" "AsyncProcesses"
+    component "process" "Process"
+    component "channel" "Channel"
+    component "process-instruction" "ProcessInstruction"
+    component "process-policy" "ProcessPolicy"
+  rules "semantics.rule"
+    rule "spawn-process" "spawn-process" "create-child-and-transfer-captures"
+    rule "channel-fifo" "channel-fifo" "enqueue-and-dequeue-in-order"
+    rule "send-asynchronous" "send-asynchronous" "enqueue-or-deliver-without-blocking-sender"
+    rule "receive-block" "receive-block" "block-on-empty-channel"
+    rule "receive-wake" "receive-wake" "deliver-and-wake-oldest-receiver"
+  entity "process.bool0.policy" "language.process-policy"
+    attr "channel-order" "fifo"
+    attr "failure" "strict"
+    attr "language" "language.bool0"
+    attr "max-steps" "256"
+    attr "receive" "block-or-deliver"
+    attr "scheduling" "program-order"
+    attr "send" "asynchronous"
+  entity "process.bool0.alloc-job" "language.process.alloc"
+    attr "language" "language.bool0"
+    attr "mode" "affine"
+    attr "name" "job"
+  entity "process.bool0.new-jobs" "language.process.new-channel"
+    attr "channel" "jobs"
+    attr "language" "language.bool0"
+  entity "process.bool0.spawn-worker" "language.process.spawn"
+    attr "captures" ""
+    attr "child" "worker"
+    attr "language" "language.bool0"
+  entity "process.bool0.send-job" "language.process.send"
+    attr "channel" "jobs"
+    attr "language" "language.bool0"
+    attr "resource" "job"
+  entity "process.bool0.receive-job" "language.process.receive"
+    attr "channel" "jobs"
+    attr "language" "language.bool0"
+    attr "process" "worker"
+  entity "process.bool0.async-program" "language.process-program"
+    attr "language" "language.bool0"
+    attr "step01" "process.bool0.alloc-job"
+    attr "step02" "process.bool0.new-jobs"
+    attr "step03" "process.bool0.spawn-worker"
+    attr "step04" "process.bool0.send-job"
+    attr "step05" "process.bool0.receive-job"
+  entity "process.bool0.wakeup-program" "language.process-program"
+    attr "language" "language.bool0"
+    attr "step01" "process.bool0.new-jobs"
+    attr "step02" "process.bool0.spawn-worker"
+    attr "step03" "process.bool0.receive-job"
+    attr "step04" "process.bool0.alloc-job"
+    attr "step05" "process.bool0.send-job"
