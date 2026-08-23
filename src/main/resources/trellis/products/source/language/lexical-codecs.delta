@@ -1,0 +1,446 @@
+delta-change "lexical-codecs"
+message "LexicalCodecs adds graph-resident bidirectional lexical value codecs"
+author "ai"
+doc "guide" """
+  |# LexicalCodecs: graph-resident lexical value codecs
+  |
+  |LexicalCodecs is a post-constitution product evolution over LexicalExpressions. It does not modify the frozen F0-F11 bootstrap staircase.
+  |
+  |## Derivation
+  |
+  |```text
+  |LexicalExpressions + LexicalCodecs.delta = LexicalCodecs
+  |```
+  |
+  |Frozen identities:
+  |
+  |```text
+  |LexicalCodecs.delta = f757ae3ac518c64a50c62063813d46d6be1efb0aed0b9c86e58ab363043a5485
+  |LexicalCodecs root  = d95d6fb30b3377466c6aae6f31b13830806eb3691cef2dab5384c7c3197162e8
+  |```
+  |
+  |The materialized LexicalCodecs graph contains 456 nodes, 595 edges, and 456 entities.
+  |
+  |## Purpose
+  |
+  |LexicalExpressions made lexical recognition graph-resident but lexical AST fields still contained the matched source spelling. LexicalCodecs separates recognition from value semantics:
+  |
+  |```text
+  |source characters
+  |      |
+  |      v
+  |lexer expression graph
+  |      |
+  |      v
+  |matched token
+  |      |
+  |      v
+  |lexer.rule --codec--> lexical codec graph
+  |      |
+  |      v
+  |semantic lexical value
+  |```
+  |
+  |Printing follows the inverse path through the same codec.
+  |
+  |## Codec vocabulary
+  |
+  |LexicalCodecs introduces first-class codec nodes:
+  |
+  |- `lexer.codec.identity`
+  |- `lexer.codec.decimal-natural`
+  |- `lexer.codec.quoted-string`
+  |- `lexer.escape`
+  |
+  |Each LexicalCodecs lexer rule has a typed `codec` input. String escape mappings are separate graph entities connected to the quoted-string codec by ordered `lexer.codec-escape` edges.
+  |
+  |No regex or host callback is stored in the graph.
+  |
+  |## Bool0 codecs
+  |
+  |### Identifier
+  |
+  |`lexer.bool0.codec.identifier` uses the identity codec. A recognized identifier such as `alpha_42` produces the semantic value `alpha_42`.
+  |
+  |### Natural number
+  |
+  |`lexer.bool0.codec.number` declares radix 10, leading-zero stripping, and canonical zero spelling `0`.
+  |
+  |```text
+  |00042  -> semantic value "42" -> print "42"
+  |00000  -> semantic value "0"  -> print "0"
+  |```
+  |
+  |Unicode digit recognition remains a LexicalExpressions lexical-expression concern; the codec maps recognized decimal digits to canonical ASCII decimal value text.
+  |
+  |### Quoted string
+  |
+  |`lexer.bool0.codec.string` declares the quote and escape characters. Its escape table is graph data. Decoded characters are stored as canonical Unicode code-point integers, avoiding raw control characters in the delta artifact:
+  |
+  |```text
+  |\"  <-> "
+  |\\  <-> \
+  |\
+  |  <-> newline
+  |\	  <-> tab
+  |\  <-> carriage return
+  |```
+  |
+  |The AST stores the decoded string value. Printing escapes required characters canonically.
+  |
+  |## AST representation
+  |
+  |Earlier LexicalExpressions trees continue to use:
+  |
+  |```scala
+  |FieldValue.Lexeme(sort, constructor, sourceText)
+  |```
+  |
+  |LexicalCodecs trees use:
+  |
+  |```scala
+  |FieldValue.Value(sort, constructor, semanticValue)
+  |```
+  |
+  |This preserves the historical LexicalExpressions product as an executable differential oracle while allowing LexicalCodecs to model true lexical values.
+  |
+  |## Laws
+  |
+  |For admitted LexicalCodecs lexical values:
+  |
+  |```text
+  |decode(encode(value)) = value
+  |```
+  |
+  |For accepted source tokens:
+  |
+  |```text
+  |parse(print(parse(source))) = parse(source)
+  |```
+  |
+  |Source spelling may normalize. For example `00042` prints as `42`.
+  |
+  |Codec definitions fail closed. Duplicate decoded escape values are rejected because they would make canonical encoding ambiguous.
+  |
+  |## Free changes
+  |
+  |`DeltaBool0` is extended to admit the LexicalCodecs language-owned kinds:
+  |
+  |- `lexer.codec.identity`
+  |- `lexer.codec.decimal-natural`
+  |- `lexer.codec.quoted-string`
+  |- `lexer.escape`
+  |
+  |The generic `replace-preserving-edges` operation can therefore evolve codec semantics without changing Scala parser or lexer code. The successor graph is accepted only when the resulting LexicalCodecs definition validates.
+  |
+  |## Historical isolation
+  |
+  |`Language.lexical-expressions` remains the frozen LexicalExpressions product graph. `Language.graph` advances to LexicalCodecs. All LexicalExpressions tests run against `Language.lexical-expressions`, so earlier behavior cannot pass accidentally through the newer implementation.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "lexical-expressions"
+  assert "defines" "delta.bool0.op.remove" "language.change-operator"
+depends "lexical-expressions"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "lexer.bool0.expr.string" "self" "lexer.bool0.rule.string" "body" "lexer.rule-body"
+  disconnect "lexer.bool0.rule.number" "self" "lexer.bool0" "rule02" "lexer.rule"
+  disconnect "lexer.bool0.skip.whitespace" "self" "lexer.bool0" "skip01" "lexer.skip"
+  disconnect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  disconnect "language.bool0.sort.String" "self" "lexer.bool0.rule.string" "sort" "lexer.rule-sort"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "lexer.bool0.source.grammar-literals" "self" "lexer.bool0" "source" "lexer.token-source"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  disconnect "lexer.bool0.rule.identifier" "self" "grammar.bool0.g5.var.token" "rule" "grammar.token-rule"
+  disconnect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  disconnect "lexer.bool0.expr.number" "self" "lexer.bool0.rule.number" "body" "lexer.rule-body"
+  disconnect "language.bool0.ctor.StringToken" "self" "lexer.bool0.rule.string" "constructor" "lexer.rule-constructor"
+  disconnect "lexer.bool0.skip.comment" "self" "lexer.bool0" "skip02" "lexer.skip"
+  disconnect "lexical-expressions.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "language.bool0.ctor.NumberToken" "self" "lexer.bool0.rule.number" "constructor" "lexer.rule-constructor"
+  disconnect "lexer.bool0.rule.number" "self" "grammar.bool0.g5.number.token" "rule" "grammar.token-rule"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "lexer.bool0.rule.string" "self" "grammar.bool0.g5.string.token" "rule" "grammar.token-rule"
+  disconnect "lexer.bool0.expr.identifier" "self" "lexer.bool0.rule.identifier" "body" "lexer.rule-body"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "lexer.bool0.rule.string" "self" "lexer.bool0" "rule03" "lexer.rule"
+  disconnect "language.bool0.sort.Number" "self" "lexer.bool0.rule.number" "sort" "lexer.rule-sort"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "lexer.bool0.selection.longest" "self" "lexer.bool0" "selection" "lexer.selection"
+  disconnect "lexer5.schema" "self" "lexer.bool0" "schema" "lexer.schema"
+  disconnect "language.bool0.sort.Name" "self" "lexer.bool0.rule.identifier" "sort" "lexer.rule-sort"
+  disconnect "lexer.bool0.rule.identifier" "self" "lexer.bool0" "rule01" "lexer.rule"
+  disconnect "language.bool0.ctor.NameToken" "self" "lexer.bool0.rule.identifier" "constructor" "lexer.rule-constructor"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "LexicalCodecs"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.token;language.constructor;language.constructor-field;language.sort;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "LexicalCodecs"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.token;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.definition;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p09" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p10" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p11" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "lexical-v6"
+    attr "language" "language.bool0"
+    attr "lexer-model" "codec-v6"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "precedence-climbing"
+    attr "printer" "token-graph"
+    attr "slice" "LexicalCodecs"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "graph-lexer"
+  replace "lexer.bool0" "lexer.definition"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "skip01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "skip02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "selection" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "rule01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "rule02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "rule03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "codec-model" "first-class-v6"
+    attr "expression-model" "first-class-v5"
+    attr "failure" "fail-closed"
+    attr "language" "language.bool0"
+    attr "name" "Bool0Lexer"
+    attr "slice" "LexicalCodecs"
+    attr "version" "6"
+  replace "lexer.bool0.rule.identifier" "lexer.rule"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "codec" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "identifier"
+    attr "priority" "100"
+    attr "slice" "LexicalCodecs"
+  replace "lexer.bool0.rule.number" "lexer.rule"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "codec" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "number"
+    attr "priority" "110"
+    attr "slice" "LexicalCodecs"
+  replace "lexer.bool0.rule.string" "lexer.rule"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "codec" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "string"
+    attr "priority" "120"
+    attr "slice" "LexicalCodecs"
+  replace "lexical-codecs.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "lexical value codecs over first-class lexer expressions"
+    attr "name" "LexicalCodecs"
+    attr "slice" "LexicalCodecs"
+  replace "lexer.bool0.codec.identifier" "lexer.codec.identity"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "identifier-identity"
+    attr "slice" "LexicalCodecs"
+  replace "lexer.bool0.codec.number" "lexer.codec.decimal-natural"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "leading-zeros" "strip"
+    attr "name" "decimal-natural"
+    attr "radix" "10"
+    attr "slice" "LexicalCodecs"
+    attr "zero" "0"
+  replace "lexer.bool0.codec.string" "lexer.codec.quoted-string"
+    port "escape01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "escape02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "escape03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "escape04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "escape05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "escape" "\\"
+    attr "language" "language.bool0"
+    attr "name" "quoted-string"
+    attr "quote" "\""
+    attr "slice" "LexicalCodecs"
+  replace "lexer.bool0.escape.backslash" "lexer.escape"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "backslash"
+    attr "slice" "LexicalCodecs"
+    attr "source" "\\"
+    attr "value-codepoint" "92"
+  replace "lexer.bool0.escape.newline" "lexer.escape"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "newline"
+    attr "slice" "LexicalCodecs"
+    attr "source" "n"
+    attr "value-codepoint" "10"
+  replace "lexer.bool0.escape.quote" "lexer.escape"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "quote"
+    attr "slice" "LexicalCodecs"
+    attr "source" "\""
+    attr "value-codepoint" "34"
+  replace "lexer.bool0.escape.return" "lexer.escape"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "return"
+    attr "slice" "LexicalCodecs"
+    attr "source" "r"
+    attr "value-codepoint" "13"
+  replace "lexer.bool0.escape.tab" "lexer.escape"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "tab"
+    attr "slice" "LexicalCodecs"
+    attr "source" "t"
+    attr "value-codepoint" "9"
+  replace "lexer.component.codec" "lexer.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "bidirectional lexical value decoder and canonical encoder"
+    attr "name" "Codec"
+    attr "slice" "LexicalCodecs"
+  replace "lexer.component.escape" "lexer.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one decoded/canonical escape mapping used by lexical codecs"
+    attr "name" "Escape"
+    attr "slice" "LexicalCodecs"
+  replace "lexer6.schema" "lexer.schema"
+    port "definition" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "skip" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "selection" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token-source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "rule" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "char-class" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "codec" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "escape" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "first-class lexical expressions with bidirectional semantic codecs"
+    attr "name" "Lexer6"
+    attr "slice" "LexicalCodecs"
+  connect "lexer.bool0.rule.identifier" "self" "grammar.bool0.g5.var.token" "rule" "grammar.token-rule"
+  connect "grammar.component.literal" "self" "lexical-codecs.schema" "literal" "grammar.component"
+  connect "language.bool0.sort.Number" "self" "lexer.bool0.rule.number" "sort" "lexer.rule-sort"
+  connect "grammar.component.expression" "self" "lexical-codecs.schema" "expression" "grammar.component"
+  connect "lexer.component.choice" "self" "lexer6.schema" "choice" "lexer.component"
+  connect "grammar.component.sequence" "self" "lexical-codecs.schema" "sequence" "grammar.component"
+  connect "lexer.bool0.escape.backslash" "self" "lexer.bool0.codec.string" "escape02" "lexer.codec-escape"
+  connect "lexer.bool0.rule.string" "self" "lexer.bool0" "rule03" "lexer.rule"
+  connect "grammar.component.cardinality" "self" "lexical-codecs.schema" "cardinality" "grammar.component"
+  connect "lexer.bool0.rule.identifier" "self" "lexer.bool0" "rule01" "lexer.rule"
+  connect "language.bool0.sort.Name" "self" "lexer.bool0.rule.identifier" "sort" "lexer.rule-sort"
+  connect "lexer.component.codec" "self" "lexer6.schema" "codec" "lexer.component"
+  connect "lexer.bool0.escape.return" "self" "lexer.bool0.codec.string" "escape05" "lexer.codec-escape"
+  connect "lexer.bool0.expr.number" "self" "lexer.bool0.rule.number" "body" "lexer.rule-body"
+  connect "language.bool0.ctor.NumberToken" "self" "lexer.bool0.rule.number" "constructor" "lexer.rule-constructor"
+  connect "lexer.bool0.codec.number" "self" "lexer.bool0.rule.number" "codec" "lexer.rule-codec"
+  connect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  connect "grammar.component.optional" "self" "lexical-codecs.schema" "optional" "grammar.component"
+  connect "lexer.bool0.skip.whitespace" "self" "lexer.bool0" "skip01" "lexer.skip"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "grammar.component.lexer" "self" "lexical-codecs.schema" "lexer" "grammar.component"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "lexer.component.escape" "self" "lexer6.schema" "escape" "lexer.component"
+  connect "grammar.component.choice" "self" "lexical-codecs.schema" "choice" "grammar.component"
+  connect "language.bool0.sort.String" "self" "lexer.bool0.rule.string" "sort" "lexer.rule-sort"
+  connect "lexer.bool0.expr.string" "self" "lexer.bool0.rule.string" "body" "lexer.rule-body"
+  connect "lexer.bool0.escape.newline" "self" "lexer.bool0.codec.string" "escape03" "lexer.codec-escape"
+  connect "lexer.bool0.escape.tab" "self" "lexer.bool0.codec.string" "escape04" "lexer.codec-escape"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "grammar.component.precedence" "self" "lexical-codecs.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "lexical-codecs.schema" "associativity" "grammar.component"
+  connect "grammar.component.token" "self" "lexical-codecs.schema" "token" "grammar.component"
+  connect "lexer.bool0.source.grammar-literals" "self" "lexer.bool0" "source" "lexer.token-source"
+  connect "lexer.component.char-class" "self" "lexer6.schema" "char-class" "lexer.component"
+  connect "language.bool0.ctor.NameToken" "self" "lexer.bool0.rule.identifier" "constructor" "lexer.rule-constructor"
+  connect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  connect "lexer6.schema" "self" "lexer.bool0" "schema" "lexer.schema"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "lexer.bool0.skip.comment" "self" "lexer.bool0" "skip02" "lexer.skip"
+  connect "lexer.bool0.codec.string" "self" "lexer.bool0.rule.string" "codec" "lexer.rule-codec"
+  connect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "lexer.bool0.expr.identifier" "self" "lexer.bool0.rule.identifier" "body" "lexer.rule-body"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "lexer.bool0.codec.identifier" "self" "lexer.bool0.rule.identifier" "codec" "lexer.rule-codec"
+  connect "lexical-codecs.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "lexer.bool0.escape.quote" "self" "lexer.bool0.codec.string" "escape01" "lexer.codec-escape"
+  connect "lexer.component.expression" "self" "lexer6.schema" "expression" "lexer.component"
+  connect "lexer.component.skip" "self" "lexer6.schema" "skip" "lexer.component"
+  connect "lexer.bool0.selection.longest" "self" "lexer.bool0" "selection" "lexer.selection"
+  connect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "lexer.component.token-source" "self" "lexer6.schema" "token-source" "lexer.component"
+  connect "grammar.component.repeat" "self" "lexical-codecs.schema" "repeat" "grammar.component"
+  connect "grammar.component.reference" "self" "lexical-codecs.schema" "reference" "grammar.component"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "lexer.component.sequence" "self" "lexer6.schema" "sequence" "lexer.component"
+  connect "lexer.bool0.rule.string" "self" "grammar.bool0.g5.string.token" "rule" "grammar.token-rule"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  connect "lexer.component.literal" "self" "lexer6.schema" "literal" "lexer.component"
+  connect "language.bool0.ctor.StringToken" "self" "lexer.bool0.rule.string" "constructor" "lexer.rule-constructor"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.component.capture" "self" "lexical-codecs.schema" "capture" "grammar.component"
+  connect "lexer.component.repeat" "self" "lexer6.schema" "repeat" "lexer.component"
+  connect "lexer.bool0.rule.number" "self" "grammar.bool0.g5.number.token" "rule" "grammar.token-rule"
+  connect "lexer.bool0.rule.number" "self" "lexer.bool0" "rule02" "lexer.rule"
+  connect "lexer.component.definition" "self" "lexer6.schema" "definition" "lexer.component"
+  connect "lexer.component.rule" "self" "lexer6.schema" "rule" "lexer.component"
+  connect "lexer.component.selection" "self" "lexer6.schema" "selection" "lexer.component"
