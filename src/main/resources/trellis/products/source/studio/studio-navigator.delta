@@ -1,0 +1,58 @@
+delta-change "studio-navigator"
+message "add deterministic Studio graph navigator"
+author "bootstrap"
+doc "guide" """
+  |# StudioNavigator: deterministic Studio graph navigator
+  |
+  |StudioNavigator begins roadmap Slice D with a semantic graph navigator independent of
+  |files and text offsets. A graph-selected policy controls breadth-first traversal,
+  |relation/identity ordering, semantic-key deduplication, strict failure, depth,
+  |and result bounds.
+  |
+  |Selections retain stable entity, node, and edge identities. Views contain the
+  |center plus deterministic `(depth, relation, selection)` items. Unknown or
+  |unsupported selections and policy edits fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |StudioNavigator.delta
+  |0561d63803d61dfa8fe24515cba990bfa61350943443f20294f754bc080793b7
+  |
+  |StudioNavigator root
+  |d7e8d55682cdaae2424491c2355bce85aac72fd522666e4944883d7a6d5931fd
+  |
+  |631 nodes
+  |783 edges
+  |631 entities
+  |16 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "ceskr-traces"
+  assert "introduces" "graph-navigation.schema" "grammar.schema"
+depends "ceskr-traces"
+  entity "graph-navigation.schema" "grammar.schema"
+    attr "extends" "CeskrTraces"
+    attr "name" "GraphNavigation"
+    attr "purpose" "studio-graph-navigator"
+  entity "studio-navigator.schema" "studio.schema"
+    attr "feature" "graph-navigator"
+    attr "name" "StudioNavigator"
+  components "studio.component" "StudioNavigator"
+    component "navigator" "Navigator"
+    component "selection" "Selection"
+    component "neighborhood" "Neighborhood"
+  rules "studio.rule"
+    rule "navigator-breadth-first" "breadth-first" "visit-by-depth"
+    rule "navigator-semantic-identity" "semantic-identity" "deduplicate-selection-keys"
+  entity "studio.navigator.policy" "studio.navigator-policy"
+    attr "failure" "strict"
+    attr "identity" "semantic"
+    attr "max-depth" "2"
+    attr "max-results" "256"
+    attr "order" "relation-then-identity"
+    attr "traversal" "breadth-first"
