@@ -1,0 +1,250 @@
+delta-change "session-protocols"
+message "add graph-defined dual session protocols"
+author "bootstrap"
+doc "guide" """
+  |# SessionProtocols: dual session protocols
+  |
+  |SessionProtocols is a post-constitution product delta layered over AsyncProcesses. It does
+  |not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Purpose
+  |
+  |AsyncProcesses adds processes and asynchronous channels. SessionProtocols adds deterministic
+  |session automata that constrain the labels and directions permitted on channel
+  |endpoints.
+  |
+  |Each protocol has:
+  |
+  |```text
+  |one initial state
+  |one reciprocal dual protocol
+  |language-owned states
+  |language-owned send/receive transitions
+  |zero or more terminal states
+  |```
+  |
+  |Generated CESK-R transitions and canonical trace encoding remain later layers.
+  |
+  |## Protocol graph
+  |
+  |The frozen Bool0 example defines dual request/reply endpoints:
+  |
+  |```text
+  |Client: send request -> receive reply -> terminal
+  |Server: receive request -> send reply -> terminal
+  |```
+  |
+  |Protocols, states, and transitions are stable graph entities. Every state names
+  |its reciprocal dual state. Every transition names its reciprocal dual
+  |transition.
+  |
+  |## Exact duality
+  |
+  |SessionProtocols validates duality structurally:
+  |
+  |1. protocol dual references are reciprocal,
+  |2. state dual references are reciprocal,
+  |3. dual states agree on terminal status,
+  |4. transition dual references are reciprocal,
+  |5. `send` is paired with `receive` and vice versa,
+  |6. dual transitions carry the same label,
+  |7. source and target states correspond through state duals.
+  |
+  |A changed label, direction, endpoint, state mapping, or one-way dual reference
+  |therefore fails closed before a session executes.
+  |
+  |## Deterministic conformance
+  |
+  |`runSession` starts from the protocol's initial state and consumes ordered
+  |`SessionAction(direction, label)` values. The selected transition key is:
+  |
+  |```text
+  |(current state, direction, label)
+  |```
+  |
+  |There must be exactly one matching transition. Missing transitions reject the
+  |action; duplicate keys reject the protocol as non-deterministic. Successful
+  |execution returns the final state and exact transition entity path.
+  |
+  |## Completion
+  |
+  |`session.bool0.policy` selects:
+  |
+  |```text
+  |determinism    = state-direction-label
+  |duality        = exact
+  |completion     = terminal
+  |failure        = strict
+  |max-transitions = 256
+  |```
+  |
+  |An accepted action prefix is not a completed session. The final state must have
+  |`terminal = true`, and the action count must remain within the graph-selected
+  |bound. Unsupported policy edits, out-of-order actions, incomplete sessions, and
+  |overlong sessions fail closed.
+  |
+  |## Process relationship
+  |
+  |SessionProtocols validates protocol behavior independently of queue scheduling. A later
+  |lowering can pair session `send`/`receive` actions with AsyncProcesses process
+  |instructions while retaining the already validated asynchronous FIFO and
+  |ownership behavior. This layer establishes the protocol contract first.
+  |
+  |## Graph-defined rules
+  |
+  |The product graph names the interpreted obligations:
+  |
+  |```text
+  |semantics.rule.session-duality
+  |semantics.rule.session-determinism
+  |semantics.rule.session-completion
+  |```
+  |
+  |SessionProtocols admission requires these rules, validates exact duality, and executes
+  |both frozen endpoints to their terminal states.
+  |
+  |## Grammar compatibility
+  |
+  |SessionProtocols does not alter syntax, expression evaluation, process execution,
+  |modules, names, or recovery. AsyncProcesses process witnesses and all earlier source
+  |programs remain observationally identical.
+  |
+  |## Invariants
+  |
+  |SessionProtocols tests enforce:
+  |
+  |1. canonical AsyncProcesses + SessionProtocols.delta derivation,
+  |2. first-class protocol/state/transition/policy/rule vocabulary,
+  |3. reciprocal protocol, state, and transition duality,
+  |4. deterministic client and server request/reply completion,
+  |5. rejection of out-of-order and incomplete action sequences,
+  |6. rejection of changed labels and unsupported policies,
+  |7. AsyncProcesses processes and LambdaMatchSemantics expressions remain identical,
+  |8. SessionProtocols remains outside F0-F11 and all earlier product identities.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |SessionProtocols.delta
+  |d6168950cbb1c7e073492206d5be70e02f685053cf5de65259796f80992f6573
+  |
+  |SessionProtocols root
+  |f567954e80365bb45a214e384e44e64010ff56f15571c0c4c12dfe3b352d9a2e
+  |
+  |601 nodes
+  |783 edges
+  |601 entities
+  |46 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "async-processes"
+  assert "introduces" "session-protocols.schema" "grammar.schema"
+depends "async-processes"
+  entity "session-protocols.schema" "grammar.schema"
+    attr "extends" "AsyncProcesses"
+    attr "name" "SessionProtocols"
+    attr "purpose" "dual-session-protocol-semantics"
+  entity "session15.schema" "session.schema"
+    attr "completion" "terminal"
+    attr "duality" "exact"
+    attr "name" "Session15"
+  components "language.component" "SessionProtocols"
+    component "session-protocol" "SessionProtocol"
+  components "semantics.component" "SessionProtocols"
+    component "session" "Session"
+    component "session-state" "SessionState"
+    component "session-transition" "SessionTransition"
+    component "session-policy" "SessionPolicy"
+  rules "semantics.rule"
+    rule "session-duality" "session-duality" "mirror-send-receive-label-and-state"
+    rule "session-determinism" "session-determinism" "unique-state-direction-label-transition"
+    rule "session-completion" "session-completion" "require-terminal-final-state"
+  entity "session.bool0.policy" "language.session-policy"
+    attr "completion" "terminal"
+    attr "determinism" "state-direction-label"
+    attr "duality" "exact"
+    attr "failure" "strict"
+    attr "language" "language.bool0"
+    attr "max-transitions" "256"
+  entity "session.bool0.client" "language.session-protocol"
+    attr "dual" "session.bool0.server"
+    attr "initial" "session.bool0.client.s0"
+    attr "language" "language.bool0"
+    attr "name" "Client"
+  entity "session.bool0.server" "language.session-protocol"
+    attr "dual" "session.bool0.client"
+    attr "initial" "session.bool0.server.s0"
+    attr "language" "language.bool0"
+    attr "name" "Server"
+  entity "session.bool0.client.s0" "language.session-state"
+    attr "dual" "session.bool0.server.s0"
+    attr "language" "language.bool0"
+    attr "name" "start"
+    attr "protocol" "session.bool0.client"
+    attr "terminal" "false"
+  entity "session.bool0.client.s1" "language.session-state"
+    attr "dual" "session.bool0.server.s1"
+    attr "language" "language.bool0"
+    attr "name" "waiting"
+    attr "protocol" "session.bool0.client"
+    attr "terminal" "false"
+  entity "session.bool0.client.s2" "language.session-state"
+    attr "dual" "session.bool0.server.s2"
+    attr "language" "language.bool0"
+    attr "name" "done"
+    attr "protocol" "session.bool0.client"
+    attr "terminal" "true"
+  entity "session.bool0.server.s0" "language.session-state"
+    attr "dual" "session.bool0.client.s0"
+    attr "language" "language.bool0"
+    attr "name" "start"
+    attr "protocol" "session.bool0.server"
+    attr "terminal" "false"
+  entity "session.bool0.server.s1" "language.session-state"
+    attr "dual" "session.bool0.client.s1"
+    attr "language" "language.bool0"
+    attr "name" "replying"
+    attr "protocol" "session.bool0.server"
+    attr "terminal" "false"
+  entity "session.bool0.server.s2" "language.session-state"
+    attr "dual" "session.bool0.client.s2"
+    attr "language" "language.bool0"
+    attr "name" "done"
+    attr "protocol" "session.bool0.server"
+    attr "terminal" "true"
+  entity "session.bool0.client.send-request" "language.session-transition"
+    attr "action" "send"
+    attr "dual" "session.bool0.server.receive-request"
+    attr "from" "session.bool0.client.s0"
+    attr "label" "request"
+    attr "language" "language.bool0"
+    attr "protocol" "session.bool0.client"
+    attr "to" "session.bool0.client.s1"
+  entity "session.bool0.client.receive-reply" "language.session-transition"
+    attr "action" "receive"
+    attr "dual" "session.bool0.server.send-reply"
+    attr "from" "session.bool0.client.s1"
+    attr "label" "reply"
+    attr "language" "language.bool0"
+    attr "protocol" "session.bool0.client"
+    attr "to" "session.bool0.client.s2"
+  entity "session.bool0.server.receive-request" "language.session-transition"
+    attr "action" "receive"
+    attr "dual" "session.bool0.client.send-request"
+    attr "from" "session.bool0.server.s0"
+    attr "label" "request"
+    attr "language" "language.bool0"
+    attr "protocol" "session.bool0.server"
+    attr "to" "session.bool0.server.s1"
+  entity "session.bool0.server.send-reply" "language.session-transition"
+    attr "action" "send"
+    attr "dual" "session.bool0.client.receive-reply"
+    attr "from" "session.bool0.server.s1"
+    attr "label" "reply"
+    attr "language" "language.bool0"
+    attr "protocol" "session.bool0.server"
+    attr "to" "session.bool0.server.s2"
