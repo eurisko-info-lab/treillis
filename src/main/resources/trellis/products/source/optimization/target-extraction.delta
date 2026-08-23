@@ -1,0 +1,76 @@
+delta-change "target-extraction"
+message "add target-dependent e-graph extraction"
+author "bootstrap"
+doc "guide" """
+  |# TargetExtraction: target-dependent extraction
+  |
+  |TargetExtraction scores every verified e-class representative against an exact graph
+  |target profile over all seven F6 cost dimensions. Extraction records all scores
+  |and selects minimum score with deterministic term tie-breaking.
+  |
+  |The compact profile chooses `beta-contract`; the latency profile chooses
+  |`beta-redex`. Incomplete profiles and unsupported policy fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |TargetExtraction.delta
+  |c366949903c1f4b54abc34d654df183e57fcc7a928fa140c89e03dd2843550e2
+  |
+  |TargetExtraction root
+  |b9abbf796c732a5f9286fdb73ad759d325689a9d30a993e5cf9ec09c213792e9
+  |
+  |691 nodes
+  |783 edges
+  |691 entities
+  |22 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "optimization-laws"
+  assert "introduces" "target-extraction.schema" "optimization.schema"
+depends "optimization-laws"
+  entity "target-extraction.schema" "optimization.schema"
+    attr "extends" "OptimizationLaws"
+    attr "feature" "target-dependent-extraction"
+    attr "name" "TargetExtraction"
+  components "optimization.component" "TargetExtraction"
+    component "target" "Target"
+    component "extraction" "Extraction"
+    component "candidate-score" "CandidateScore"
+  rules "optimization.rule"
+    rule "target-weighted-score" "target-weighted-score" "score-all-eclass-candidates"
+    rule "target-tie-break" "target-tie-break" "minimum-score-then-term"
+  entity "optimization.target.policy" "optimization.target-policy"
+    attr "dimensions" "exact"
+    attr "failure" "strict"
+    attr "selection" "minimum-score-then-term"
+  entity "optimization.enode.beta-redex" "equality.enode"
+    attr "critical-path" "1"
+    attr "nodes" "2"
+    attr "operator" "beta-redex"
+  entity "optimization.enode.beta-contract" "equality.enode"
+    attr "critical-path" "3"
+    attr "nodes" "1"
+    attr "operator" "beta-contract"
+  entity "optimization.target.compact" "optimization.target"
+    attr "allocations" "0"
+    attr "communication" "0"
+    attr "critical-path" "1"
+    attr "interactions" "0"
+    attr "name" "compact"
+    attr "nodes" "10"
+    attr "peak-memory" "0"
+    attr "replication" "0"
+  entity "optimization.target.latency" "optimization.target"
+    attr "allocations" "0"
+    attr "communication" "0"
+    attr "critical-path" "10"
+    attr "interactions" "0"
+    attr "name" "latency"
+    attr "nodes" "1"
+    attr "peak-memory" "0"
+    attr "replication" "0"
