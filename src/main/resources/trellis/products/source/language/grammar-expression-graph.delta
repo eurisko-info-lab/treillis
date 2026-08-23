@@ -1,0 +1,299 @@
+delta-change "grammar-expression-graph"
+message "install ExpressionGrammar first-class grammar expression graph over LanguageBootstrap"
+author "trellis-product"
+doc "guide" """
+  |# ExpressionGrammar — first-class grammar expression graphs
+  |
+  |ExpressionGrammar is the second product slice above the frozen F0–F11 constitution. It is not F12.
+  |
+  |It derives strictly from the validated LanguageBootstrap product graph:
+  |
+  |```text
+  |F11 --LanguageBootstrap.delta--> LanguageBootstrap --ExpressionGrammar.delta--> ExpressionGrammar
+  |```
+  |
+  |## Why ExpressionGrammar exists
+  |
+  |TemplateGrammar already made object-language grammars graph data, but each production still carried a compact host-interpreted string such as:
+  |
+  |```text
+  |lit:and;ref:left:Expr;ref:right:Expr
+  |```
+  |
+  |That was useful for bootstrapping the product layer, but it left a miniature grammar language hidden inside an attribute string.
+  |
+  |ExpressionGrammar removes that island. Production bodies are now ordinary Trellis subgraphs.
+  |
+  |## Expression vocabulary
+  |
+  |ExpressionGrammar adds first-class graph entities for:
+  |
+  |- `grammar.literal` — one terminal token;
+  |- `grammar.reference` — a named recursive reference to a language sort;
+  |- `grammar.sequence` — an ordered sequence of grammar expressions;
+  |- `expression-grammar.schema` — the schema selected by grammars using first-class expressions.
+  |
+  |Order is represented structurally by numbered input ports (`item01`, `item02`, ...), not by a delimited attribute.
+  |
+  |A production has a typed `body` input edge. References point to their target sort with a typed `grammar.reference-sort` edge.
+  |
+  |For example, Bool0's `and` production is represented as:
+  |
+  |```text
+  |literal("and") ──item01──┐
+  |ref(left -> Expr) ─item02─┼─> sequence ──body──> production And
+  |ref(right -> Expr)─item03─┘
+  |```
+  |
+  |The production itself contains no `pattern` attribute.
+  |
+  |## Generic host
+  |
+  |`Language.scala` interprets both encodings:
+  |
+  |- the frozen LanguageBootstrap graph uses the legacy TemplateGrammar production templates;
+  |- the current ExpressionGrammar graph uses first-class expression subgraphs.
+  |
+  |This compatibility is intentional. It gives a differential oracle: the same Bool0 examples must parse to the same AST and print to the same normalized text in both graphs.
+  |
+  |The current graph no longer needs `decodePattern` for its own productions. That decoder remains only so the already validated LanguageBootstrap product identity stays readable and executable.
+  |
+  |## Free changes
+  |
+  |`DeltaBool0` is extended so both `replace-preserving-edges` and `remove-with-edges` admit:
+  |
+  |```text
+  |grammar.literal
+  |grammar.reference
+  |grammar.sequence
+  |```
+  |
+  |A test rewrites the `true` literal node to `yes`. Incident semantic edges are preserved automatically, and the unchanged parser immediately accepts `yes` and rejects `true`.
+  |
+  |Invalid expression edits fail closed. For example, a literal containing whitespace is rejected when the successor graph is revalidated.
+  |
+  |## Product identities
+  |
+  |```text
+  |LanguageBootstrap.delta  a9121d11a0a297e6d2d27cad840240c134fbcd1548606bc9ddb504fd20fb16fb
+  |LanguageBootstrap root   2ccc49718f50077ac12648eca2dae87c43543ace14314a799e1247e86bcc1421
+  |
+  |ExpressionGrammar.delta   4628a7b07abfe196b369446f751a261871157fc2f99e214b97bacc11fbaa4ee9
+  |ExpressionGrammar root    75d0c77a6a20b7d3a1c039e326ad2b6b16e64bd852b923bf6d8d32026869be77
+  |nodes            305
+  |edges            326
+  |entities         305
+  |```
+  |
+  |The frozen constitutional identities F0–F11 and the LanguageBootstrap product identity are unchanged.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "language-bootstrap"
+  assert "introduces" "grammar.component.expression" "grammar.component"
+depends "language-bootstrap"
+  replace "grammar.component.expression" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one first-class grammar expression"
+    attr "name" "Expression"
+    attr "slice" "ExpressionGrammar"
+  replace "grammar.component.literal" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one terminal literal grammar expression"
+    attr "name" "Literal"
+    attr "slice" "ExpressionGrammar"
+  replace "grammar.component.reference" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "one named recursive sort reference grammar expression"
+    attr "name" "Reference"
+    attr "slice" "ExpressionGrammar"
+  replace "grammar.component.sequence" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "ordered composition of grammar expressions"
+    attr "name" "Sequence"
+    attr "slice" "ExpressionGrammar"
+  replace "expression-grammar.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "first-class graph-resident bidirectional grammar expression schema"
+    attr "name" "ExpressionGrammar"
+    attr "slice" "ExpressionGrammar"
+  connect "grammar.component.expression" "self" "expression-grammar.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "expression-grammar.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "expression-grammar.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "expression-grammar.schema" "sequence" "grammar.component"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "first-class"
+    attr "language" "language.bool0"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "prefix-recursive"
+    attr "printer" "expression-graph"
+    attr "slice" "ExpressionGrammar"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "whitespace"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "expression-grammar.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.true" "sort" "grammar.sort"
+  disconnect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  replace "grammar.bool0.prod.true" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "priority" "10"
+    attr "slice" "ExpressionGrammar"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.true" "sort" "grammar.sort"
+  connect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.false" "sort" "grammar.sort"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  replace "grammar.bool0.prod.false" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "priority" "20"
+    attr "slice" "ExpressionGrammar"
+    attr "sort" "Expr"
+  connect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.false" "sort" "grammar.sort"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.not" "sort" "grammar.sort"
+  disconnect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  replace "grammar.bool0.prod.not" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "priority" "30"
+    attr "slice" "ExpressionGrammar"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.not" "sort" "grammar.sort"
+  connect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.and" "sort" "grammar.sort"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.and" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "priority" "40"
+    attr "slice" "ExpressionGrammar"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.and" "sort" "grammar.sort"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "ExpressionGrammar"
+    attr "target-kinds" "language.sort;language.constructor;grammar.definition;grammar.production;grammar.literal;grammar.reference;grammar.sequence;language.change-language;language.change-operator"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "ExpressionGrammar"
+    attr "target-kinds" "language.sort;language.constructor;grammar.production;grammar.literal;grammar.reference;grammar.sequence"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "grammar.bool0.expr.true.literal" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+    attr "value" "true"
+  replace "grammar.bool0.expr.false.literal" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+    attr "value" "false"
+  replace "grammar.bool0.expr.not.literal" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+    attr "value" "not"
+  replace "grammar.bool0.expr.not.value" "grammar.reference"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "value"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.expr.not.value" "sort" "grammar.reference-sort"
+  replace "grammar.bool0.expr.not.body" "grammar.sequence"
+    port "item01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+  connect "grammar.bool0.expr.not.literal" "self" "grammar.bool0.expr.not.body" "item01" "grammar.sequence-item"
+  connect "grammar.bool0.expr.not.value" "self" "grammar.bool0.expr.not.body" "item02" "grammar.sequence-item"
+  replace "grammar.bool0.expr.and.literal" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+    attr "value" "and"
+  replace "grammar.bool0.expr.and.left" "grammar.reference"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "left"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.expr.and.left" "sort" "grammar.reference-sort"
+  replace "grammar.bool0.expr.and.right" "grammar.reference"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "right"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.expr.and.right" "sort" "grammar.reference-sort"
+  replace "grammar.bool0.expr.and.body" "grammar.sequence"
+    port "item01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "slice" "ExpressionGrammar"
+  connect "grammar.bool0.expr.and.literal" "self" "grammar.bool0.expr.and.body" "item01" "grammar.sequence-item"
+  connect "grammar.bool0.expr.and.left" "self" "grammar.bool0.expr.and.body" "item02" "grammar.sequence-item"
+  connect "grammar.bool0.expr.and.right" "self" "grammar.bool0.expr.and.body" "item03" "grammar.sequence-item"
+  connect "grammar.bool0.expr.true.literal" "self" "grammar.bool0.prod.true" "body" "grammar.body"
+  connect "grammar.bool0.expr.false.literal" "self" "grammar.bool0.prod.false" "body" "grammar.body"
+  connect "grammar.bool0.expr.not.body" "self" "grammar.bool0.prod.not" "body" "grammar.body"
+  connect "grammar.bool0.expr.and.body" "self" "grammar.bool0.prod.and" "body" "grammar.body"
