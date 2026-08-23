@@ -1,0 +1,16 @@
+delta-package storage.network
+  purpose publication replicated CAS consensus discovery and attestations
+  requires optimization.core
+  provides storage.network
+  include source/storage/publication-ledger.delta
+    post-action validate-graph
+  include source/storage/distributed-cas.delta
+    post-action validate-graph
+  include source/storage/signed-publications.delta
+    post-action validate-graph
+  include source/storage/publication-consensus.delta
+    post-action validate-graph
+  include source/storage/package-discovery.delta
+    post-action validate-graph
+  include source/storage/artifact-attestations.delta
+    post-action validate-graph

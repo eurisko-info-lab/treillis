@@ -1,0 +1,37 @@
+delta-package language.trellis
+  purpose concrete-language grammar semantics and execution policies
+  imports language.core.lambda
+  provides language.trellis.syntax
+  provides language.trellis.lowering
+  include source/language/language-bootstrap.delta
+    post-action validate-graph
+  include source/language/grammar-expression-graph.delta
+    post-action validate-graph
+  include source/language/grammar-combinators.delta
+    post-action validate-graph
+  include source/language/typed-captures.delta
+    post-action validate-graph
+  include source/language/graph-lexer.delta
+    post-action validate-graph
+  include source/language/lexical-expressions.delta
+    post-action validate-graph
+  include source/language/lexical-codecs.delta
+    post-action validate-graph
+  include source/language/source-provenance.delta
+    post-action validate-graph
+  include source/language/source-maps-layout.delta
+    post-action validate-graph
+  include source/language/virtual-layout.delta
+    post-action validate-graph
+  include source/language/statements-suites.delta
+    post-action validate-graph
+  include source/language/typed-holes-diagnostics.delta
+    post-action validate-graph
+  include source/language/modules-name-resolution.delta
+    post-action validate-graph
+  include source/language/lambda-match-semantics.delta
+    post-action validate-graph
+  include source/language/async-processes.delta
+    post-action validate-graph
+  include source/language/session-protocols.delta
+    post-action validate-graph

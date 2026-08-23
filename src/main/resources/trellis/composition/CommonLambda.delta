@@ -1,0 +1,20 @@
+delta-package common.lambda
+  purpose shared typed Lambda Calculus vocabulary and beta law
+  provides language.core.lambda
+  change add common Lambda Calculus
+    entity common.lambda.schema language.package
+      attr name Lambda Calculus
+      attr namespace common.lambda
+    entity common.lambda.term.variable language.constructor
+      attr name Variable
+      attr sort Term
+    entity common.lambda.term.abstraction language.constructor
+      attr name Abstraction
+      attr sort Term
+    entity common.lambda.term.application language.constructor
+      attr name Application
+      attr sort Term
+    entity common.lambda.law.beta language.law
+      attr name beta
+      attr effect substitute argument into abstraction body
+    post-action validate-graph

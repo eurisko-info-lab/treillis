@@ -1,0 +1,6 @@
+delta-package studio.navigation
+  purpose semantic navigator protocol
+  requires language.trellis.lowering
+  provides studio.navigation
+  include source/studio/studio-navigator.delta
+    post-action validate-graph

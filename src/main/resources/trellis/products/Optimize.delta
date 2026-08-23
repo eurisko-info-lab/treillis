@@ -1,0 +1,13 @@
+delta-package optimization.core
+  purpose equality saturation extraction and executable lowering
+  requires studio.core
+  requires language.trellis.lowering
+  provides optimization.core
+  include source/optimization/egraph-derivation.delta
+    post-action validate-graph
+  include source/optimization/optimization-laws.delta
+    post-action validate-graph
+  include source/optimization/target-extraction.delta
+    post-action validate-graph
+  include source/optimization/deltanet-lowering.delta
+    post-action validate-graph

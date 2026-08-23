@@ -1,0 +1,7 @@
+delta-package optimization.differential
+  purpose CESK-R and DeltaNet differential certification
+  requires optimization.core
+  requires debug.trace
+  provides optimization.differential
+  include source/optimization/differential-certificates.delta
+    post-action validate-graph
