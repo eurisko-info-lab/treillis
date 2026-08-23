@@ -15,7 +15,9 @@ object TestMain:
       "Projection" -> ProjectionTest.tests,
       "Architecture" -> ArchitectureTest.tests,
       "TrellisLanguage" -> TrellisLanguageTest.tests,
-      "ExecutionEngine" -> ExecutionEngineTest.tests
+      "ExecutionEngine" -> ExecutionEngineTest.tests,
+      "AgentApi" -> AgentApiTest.tests,
+      "WorkspacePersistence" -> WorkspacePersistenceTest.tests
     )
     val deltaSuites = ProductCatalog.products.map { product =>
       product.name -> DeltaSourceTests.run(product).map { result =>

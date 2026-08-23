@@ -89,7 +89,7 @@ object Delta:
         case None => Right(values.map(ChangeId.apply).toSet)
     }
 
-  private def decodeOp(encoded: String): Either[String, Op] =
+  def decodeOp(encoded: String): Either[String, Op] =
     Canon.tagAndFields(encoded).flatMap {
       case ("op.add-node", Vector(nodeText)) => Canon.decodeNode(nodeText).map(Op.AddNode.apply)
       case ("op.bind-entity", Vector(entity, node)) =>

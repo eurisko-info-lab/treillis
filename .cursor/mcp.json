@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "trellis": {
+      "command": "/home/patrick/Documents/trellis-bootstrap/scripts/run-trellis-mcp.sh",
+      "env": {
+        "JAVA_HOME": "/home/patrick/.sdkman/candidates/java/21.0.8-tem",
+        "PATH": "/home/patrick/.sdkman/candidates/java/21.0.8-tem/bin:/home/patrick/.local/share/coursier/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}

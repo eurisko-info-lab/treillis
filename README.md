@@ -85,6 +85,10 @@ Commit seals that delta as one immutable change and opens a fresh delta;
 Publish separately submits a clean closed frontier to graph-defined publication
 policy.
 
+AI agents can query and edit the same local branch through the [Agent API](docs/AGENT-API.md)
+on port 8422, or through the MCP server (`./scripts/run-trellis-mcp.sh` / `.cursor/mcp.json`).
+Working deltas persist to `.trellis/workspace.json` on exit.
+
 The current Transcript edits graph entities; the workspace runner evaluates
 stored Trellis IR through DeltaNet or CESK-R. This is Squeak-like workflow
 infrastructure, not yet a Smalltalk parser or virtual machine; see
@@ -92,6 +96,7 @@ infrastructure, not yet a Smalltalk parser or virtual machine; see
 
 ## Documentation
 
+- [Agent API](docs/AGENT-API.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Assemblies and live branches](docs/ASSEMBLIES.md)
 - [Bootstrap ceremony](docs/BOOTSTRAP.md)

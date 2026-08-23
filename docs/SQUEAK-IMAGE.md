@@ -62,9 +62,11 @@ control, environment, continuation depth, and resource domain for every
 reduction. Both must return the same observable Nat.
 
 Squeak reaches the Scala engines through the loopback image service. The Rust
-web shell serves the UI and proxies image, edit, commit, publish, and execution
-requests; it contains no graph assembler or evaluator. Start both services with
-`scripts/run-squeak.sh`.
+web shell serves the UI and proxies `/api/*` to the runtime; it contains no graph
+assembler or evaluator. Start both services with `scripts/run-squeak.sh`.
+
+AI agents can query and edit the same local branch through the [Agent API](AGENT-API.md)
+on port 8422 without loading the full graph dump.
 
 ## Smalltalk status
 
