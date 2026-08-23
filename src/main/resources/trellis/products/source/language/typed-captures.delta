@@ -1,0 +1,613 @@
+delta-change "typed-captures"
+message "add TypedCaptures cardinality-aware captures and typed constructor fields"
+author "ai"
+doc "guide" """
+  |# TypedCaptures: cardinality-aware captures
+  |
+  |TypedCaptures is the third post-constitution grammar product. It is derived from the
+  |validated GrammarCombinators product graph and remains outside the frozen F0-F11 bootstrap
+  |constitution.
+  |
+  |## Frozen product identity
+  |
+  |- GrammarCombinators predecessor root: `c000ed72cf1fe773add80a64adb2aa655b0ce0b528d3c4113b01e6c041825d05`
+  |- TypedCaptures delta: `5325be5f01926b2a0520b7b9447f0baa137cfefe62db01c7a944e9ff8daae4f2`
+  |- TypedCaptures root: `c636319db67af7225fcdc617e2346fc60698992e9766393ae75441241dd55728`
+  |- Graph size: 386 nodes, 455 edges, 386 entities
+  |
+  |TypedCaptures is derived only as:
+  |
+  |```text
+  |GrammarCombinators + TypedCaptures.delta = TypedCaptures
+  |```
+  |
+  |It does not alter any F0-F11 foundation identity or any earlier product root.
+  |
+  |## Why TypedCaptures exists
+  |
+  |GrammarCombinators introduced graph-resident `optional` and `repeat` combinators, but they
+  |were deliberately capture-free. They could consume surface syntax, yet they
+  |could not say that an AST field was optional or repeated without the host
+  |inventing an implicit collection convention.
+  |
+  |TypedCaptures removes that hidden convention. Cardinality is semantic graph data.
+  |
+  |```text
+  |reference        -> T
+  |capture(one)     -> T
+  |capture(optional)-> Option[T]
+  |capture(many)    -> Vector[T]
+  |```
+  |
+  |The Scala host contains a generic field-value representation, but the choice of
+  |cardinality for a concrete constructor field comes from the Trellis graph.
+  |
+  |## First-class constructor fields
+  |
+  |Constructor fields are no longer encoded by a string attribute such as:
+  |
+  |```text
+  |fields = left:Expr;right:Expr
+  |```
+  |
+  |TypedCaptures introduces `language.constructor-field` nodes. Each field is connected
+  |by typed edges to:
+  |
+  |1. its owning constructor,
+  |2. its language sort, and
+  |3. its cardinality.
+  |
+  |The graph therefore describes a field such as `All.items` as:
+  |
+  |```text
+  |All --constructor-field--> items
+  |items --field-sort-------> Expr
+  |items --field-cardinality> many
+  |```
+  |
+  |Existing Bool0 scalar fields are migrated to the same representation with
+  |cardinality `one`.
+  |
+  |## Cardinalities
+  |
+  |TypedCaptures provides three graph-resident values for Bool0:
+  |
+  |- `one`
+  |- `optional`
+  |- `many`
+  |
+  |A `grammar.capture` node binds a grammar expression to an AST field and carries
+  |`min` and `max` bounds. The bounds must agree with the cardinality:
+  |
+  |- `one`: exactly `1..1`
+  |- `optional`: exactly `0..1`
+  |- `many`: any valid `min..max` interval
+  |
+  |Invalid combinations are rejected fail-closed by the generic language
+  |validator.
+  |
+  |## Bool0 examples
+  |
+  |TypedCaptures adds two constructors only to exercise cardinality semantics.
+  |
+  |### Optional capture
+  |
+  |```text
+  |maybe [ ]
+  |maybe [ true ]
+  |```
+  |
+  |These produce, respectively:
+  |
+  |```text
+  |Maybe(value = None)
+  |Maybe(value = Some(True))
+  |```
+  |
+  |The brackets are intentional. Without an explicit boundary, a surface such as
+  |`all [ maybe true ]` could be interpreted either as one `Maybe(Some(True))`
+  |item or as two repeated items, `Maybe(None)` and `True`. TypedCaptures resolves that
+  |ambiguity in the grammar itself rather than adding an invisible parser
+  |preference.
+  |
+  |### Repeated capture
+  |
+  |```text
+  |all [ true ! false maybe [ true ] ]
+  |```
+  |
+  |produces an `All` tree whose `items` field is a vector containing three Expr
+  |values: `True`, `Not(False)`, and `Maybe(Some(True))`.
+  |
+  |The current Bool0 example bounds `items` to at most eight values so malformed or
+  |runaway grammar edits remain easy to test. The cardinality model itself is not
+  |specific to that bound.
+  |
+  |## Printing
+  |
+  |Printing consumes the same cardinality declarations used by parsing.
+  |
+  |- `one` prints one captured tree,
+  |- `optional` prints zero or one captured tree according to the AST value,
+  |- `many` prints every captured tree in order.
+  |
+  |No constructor-specific `Maybe` or `All` printer case exists in Scala.
+  |
+  |## Compatibility
+  |
+  |GrammarCombinators remains independently materialized as `Language.grammar-combinators` and is used
+  |as a differential oracle. Existing TemplateGrammar, ExpressionGrammar, and GrammarCombinators trees retain
+  |their scalar `fields` view, while TypedCaptures exposes cardinal values through
+  |`Tree.fieldValue` / `Tree.fieldValues`.
+  |
+  |This preserves the previous product tests while allowing new AST shapes.
+  |
+  |## Free changes
+  |
+  |`DeltaBool0` is extended to admit semantic edits of:
+  |
+  |- `language.constructor-field`
+  |- `grammar.capture`
+  |- `grammar.cardinality`
+  |
+  |The normal language boundary and full post-change validation still apply. For
+  |example, changing an optional capture to bounds `0..2` is rejected because the
+  |graph would no longer agree with the field's `optional` cardinality.
+  |
+  |## Acceptance
+  |
+  |The TypedCaptures slice is accepted when:
+  |
+  |1. the Scala suite reports 164 tests and zero failures;
+  |2. `TypedCaptures.delta` has its frozen canonical change ID;
+  |3. replay over GrammarCombinators yields the frozen TypedCaptures root;
+  |4. optional and many captures parse and print round-trip;
+  |5. GrammarCombinators and TypedCaptures remain observationally equal on the GrammarCombinators surface;
+  |6. invalid cardinality edits fail closed; and
+  |7. the existing Scala/Rust F0-F11 bootstrap parity harness remains byte-identical.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "grammar-combinators"
+  assert "introduces" "grammar.component.capture" "grammar.component"
+depends "grammar-combinators"
+  entity "grammar.component.capture" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "cardinality-aware AST capture over one grammar expression"
+    attr "name" "Capture"
+    attr "slice" "TypedCaptures"
+  entity "grammar.component.cardinality" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "AST field cardinality one optional or many"
+    attr "name" "Cardinality"
+    attr "slice" "TypedCaptures"
+  entity "language.component.constructor-field" "language.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "first-class constructor field typed by sort and cardinality"
+    attr "name" "ConstructorField"
+    attr "slice" "TypedCaptures"
+  entity "grammar.bool0.cardinality.one" "grammar.cardinality"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "One"
+    attr "slice" "TypedCaptures"
+    attr "value" "one"
+  entity "grammar.bool0.cardinality.optional" "grammar.cardinality"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Optional"
+    attr "slice" "TypedCaptures"
+    attr "value" "optional"
+  entity "grammar.bool0.cardinality.many" "grammar.cardinality"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Many"
+    attr "slice" "TypedCaptures"
+    attr "value" "many"
+  entity "typed-captures.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "cardinality-aware combinator grammar with typed AST captures"
+    attr "name" "TypedCaptures"
+    attr "slice" "TypedCaptures"
+  connect "grammar.component.expression" "self" "typed-captures.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "typed-captures.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "typed-captures.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "typed-captures.schema" "sequence" "grammar.component"
+  connect "grammar.component.choice" "self" "typed-captures.schema" "choice" "grammar.component"
+  connect "grammar.component.optional" "self" "typed-captures.schema" "optional" "grammar.component"
+  connect "grammar.component.repeat" "self" "typed-captures.schema" "repeat" "grammar.component"
+  connect "grammar.component.capture" "self" "typed-captures.schema" "capture" "grammar.component"
+  connect "grammar.component.cardinality" "self" "typed-captures.schema" "cardinality" "grammar.component"
+  connect "grammar.component.precedence" "self" "typed-captures.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "typed-captures.schema" "associativity" "grammar.component"
+  entity "language.bool0.field.and.left" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "left"
+    attr "owner" "language.bool0.ctor.And"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.and.left" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.one" "self" "language.bool0.field.and.left" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.and.right" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "right"
+    attr "owner" "language.bool0.ctor.And"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.and.right" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.one" "self" "language.bool0.field.and.right" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.not.value" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "value"
+    attr "owner" "language.bool0.ctor.Not"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.not.value" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.one" "self" "language.bool0.field.not.value" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.or.left" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "left"
+    attr "owner" "language.bool0.ctor.Or"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.or.left" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.one" "self" "language.bool0.field.or.left" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.or.right" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "right"
+    attr "owner" "language.bool0.ctor.Or"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.or.right" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.one" "self" "language.bool0.field.or.right" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.group.value" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "value"
+    attr "owner" "language.bool0.ctor.Group"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.group.value" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.one" "self" "language.bool0.field.group.value" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.maybe.value" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "value"
+    attr "owner" "language.bool0.ctor.Maybe"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.maybe.value" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.optional" "self" "language.bool0.field.maybe.value" "cardinality" "language.field-cardinality"
+  entity "language.bool0.field.all.items" "language.constructor-field"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "items"
+    attr "owner" "language.bool0.ctor.All"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.field.all.items" "sort" "language.field-sort"
+  connect "grammar.bool0.cardinality.many" "self" "language.bool0.field.all.items" "cardinality" "language.field-cardinality"
+  disconnect "language.bool0.sort.Expr" "self" "language.bool0.ctor.And" "sort" "language.sort"
+  disconnect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  replace "language.bool0.ctor.And" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "And"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.And" "sort" "language.sort"
+  connect "language.bool0.field.and.left" "self" "language.bool0.ctor.And" "f01" "language.constructor-field"
+  connect "language.bool0.field.and.right" "self" "language.bool0.ctor.And" "f02" "language.constructor-field"
+  disconnect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  disconnect "language.bool0.sort.Expr" "self" "language.bool0.ctor.False" "sort" "language.sort"
+  replace "language.bool0.ctor.False" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "False"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.False" "sort" "language.sort"
+  connect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  disconnect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  disconnect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Not" "sort" "language.sort"
+  replace "language.bool0.ctor.Not" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Not"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Not" "sort" "language.sort"
+  connect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  connect "language.bool0.field.not.value" "self" "language.bool0.ctor.Not" "f01" "language.constructor-field"
+  disconnect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Or" "sort" "language.sort"
+  disconnect "language.bool0.ctor.Or" "self" "grammar.bool0.prod.or" "constructor" "grammar.constructor"
+  replace "language.bool0.ctor.Or" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Or"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Or" "sort" "language.sort"
+  connect "language.bool0.ctor.Or" "self" "grammar.bool0.prod.or" "constructor" "grammar.constructor"
+  connect "language.bool0.field.or.left" "self" "language.bool0.ctor.Or" "f01" "language.constructor-field"
+  connect "language.bool0.field.or.right" "self" "language.bool0.ctor.Or" "f02" "language.constructor-field"
+  disconnect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Group" "sort" "language.sort"
+  disconnect "language.bool0.ctor.Group" "self" "grammar.bool0.prod.group" "constructor" "grammar.constructor"
+  replace "language.bool0.ctor.Group" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Group"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.ctor.Group" "self" "grammar.bool0.prod.group" "constructor" "grammar.constructor"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Group" "sort" "language.sort"
+  connect "language.bool0.field.group.value" "self" "language.bool0.ctor.Group" "f01" "language.constructor-field"
+  disconnect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  disconnect "language.bool0.sort.Expr" "self" "language.bool0.ctor.True" "sort" "language.sort"
+  replace "language.bool0.ctor.True" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "True"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.True" "sort" "language.sort"
+  entity "language.bool0.ctor.Maybe" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Maybe"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Maybe" "sort" "language.sort"
+  connect "language.bool0.field.maybe.value" "self" "language.bool0.ctor.Maybe" "f01" "language.constructor-field"
+  entity "language.bool0.ctor.All" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "f01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "All"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.All" "sort" "language.sort"
+  connect "language.bool0.field.all.items" "self" "language.bool0.ctor.All" "f01" "language.constructor-field"
+  entity "grammar.bool0.g3.maybe.kw" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.maybe.kw"
+    attr "slice" "TypedCaptures"
+    attr "value" "maybe"
+  entity "grammar.bool0.g3.maybe.open" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.maybe.open"
+    attr "slice" "TypedCaptures"
+    attr "value" "["
+  entity "grammar.bool0.g3.maybe.close" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.maybe.close"
+    attr "slice" "TypedCaptures"
+    attr "value" "]"
+  entity "grammar.bool0.g3.maybe.value" "grammar.reference"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "__value"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.maybe.value"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.g3.maybe.value" "sort" "grammar.reference-sort"
+  entity "grammar.bool0.g3.maybe.capture" "grammar.capture"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "value"
+    attr "language" "language.bool0"
+    attr "max" "1"
+    attr "min" "0"
+    attr "name" "grammar.bool0.g3.maybe.capture"
+    attr "slice" "TypedCaptures"
+  connect "grammar.bool0.g3.maybe.value" "self" "grammar.bool0.g3.maybe.capture" "body" "grammar.capture-body"
+  connect "grammar.bool0.cardinality.optional" "self" "grammar.bool0.g3.maybe.capture" "cardinality" "grammar.cardinality"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.g3.maybe.capture" "sort" "grammar.capture-sort"
+  entity "grammar.bool0.g3.maybe.body" "grammar.sequence"
+    port "item01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.maybe.body"
+    attr "slice" "TypedCaptures"
+  connect "grammar.bool0.g3.maybe.kw" "self" "grammar.bool0.g3.maybe.body" "item01" "grammar.sequence-item"
+  connect "grammar.bool0.g3.maybe.open" "self" "grammar.bool0.g3.maybe.body" "item02" "grammar.sequence-item"
+  connect "grammar.bool0.g3.maybe.capture" "self" "grammar.bool0.g3.maybe.body" "item03" "grammar.sequence-item"
+  connect "grammar.bool0.g3.maybe.close" "self" "grammar.bool0.g3.maybe.body" "item04" "grammar.sequence-item"
+  entity "grammar.bool0.g3.all.kw" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.all.kw"
+    attr "slice" "TypedCaptures"
+    attr "value" "all"
+  entity "grammar.bool0.g3.all.open" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.all.open"
+    attr "slice" "TypedCaptures"
+    attr "value" "["
+  entity "grammar.bool0.g3.all.close" "grammar.literal"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.all.close"
+    attr "slice" "TypedCaptures"
+    attr "value" "]"
+  entity "grammar.bool0.g3.all.item" "grammar.reference"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "__item"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.all.item"
+    attr "slice" "TypedCaptures"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.g3.all.item" "sort" "grammar.reference-sort"
+  entity "grammar.bool0.g3.all.capture" "grammar.capture"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "items"
+    attr "language" "language.bool0"
+    attr "max" "8"
+    attr "min" "0"
+    attr "name" "grammar.bool0.g3.all.capture"
+    attr "slice" "TypedCaptures"
+  connect "grammar.bool0.g3.all.item" "self" "grammar.bool0.g3.all.capture" "body" "grammar.capture-body"
+  connect "grammar.bool0.cardinality.many" "self" "grammar.bool0.g3.all.capture" "cardinality" "grammar.cardinality"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.g3.all.capture" "sort" "grammar.capture-sort"
+  entity "grammar.bool0.g3.all.body" "grammar.sequence"
+    port "item01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g3.all.body"
+    attr "slice" "TypedCaptures"
+  connect "grammar.bool0.g3.all.kw" "self" "grammar.bool0.g3.all.body" "item01" "grammar.sequence-item"
+  connect "grammar.bool0.g3.all.open" "self" "grammar.bool0.g3.all.body" "item02" "grammar.sequence-item"
+  connect "grammar.bool0.g3.all.capture" "self" "grammar.bool0.g3.all.body" "item03" "grammar.sequence-item"
+  connect "grammar.bool0.g3.all.close" "self" "grammar.bool0.g3.all.body" "item04" "grammar.sequence-item"
+  entity "grammar.bool0.prod.maybe" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "70"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.maybe" "sort" "grammar.sort"
+  connect "language.bool0.ctor.Maybe" "self" "grammar.bool0.prod.maybe" "constructor" "grammar.constructor"
+  connect "grammar.bool0.g3.maybe.body" "self" "grammar.bool0.prod.maybe" "body" "grammar.body"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.maybe" "precedence" "grammar.precedence"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.maybe" "associativity" "grammar.associativity"
+  entity "grammar.bool0.prod.all" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "80"
+    attr "slice" "TypedCaptures"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.all" "sort" "grammar.sort"
+  connect "language.bool0.ctor.All" "self" "grammar.bool0.prod.all" "constructor" "grammar.constructor"
+  connect "grammar.bool0.g3.all.body" "self" "grammar.bool0.prod.all" "body" "grammar.body"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.all" "precedence" "grammar.precedence"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.all" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar-combinators.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "cardinality-v3"
+    attr "language" "language.bool0"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "precedence-climbing"
+    attr "printer" "capture-graph"
+    attr "slice" "TypedCaptures"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "whitespace"
+  connect "grammar-combinators.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar-combinators.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "typed-captures.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "TypedCaptures"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "TypedCaptures"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;language.constructor;language.constructor-field;language.sort"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
