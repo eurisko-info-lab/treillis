@@ -1,0 +1,62 @@
+delta-change "differential-certificates"
+message "add CESK-R DeltaNet differential certificates"
+author "bootstrap"
+doc "guide" """
+  |# DifferentialCertificates: CESK-R/DeltaNet differential certificates
+  |
+  |DifferentialCertificates certifies that the CESK-R reference process machine and the
+  |independent F8 DeltaNet reduction agree. A shared decode step turns a process
+  |program into one instruction stream; each machine reduces it independently,
+  |and the certificate records the DeltaNet lowering's net root alongside both
+  |machines' observable state roots, requiring `ceskr == deltanet-independent`.
+  |
+  |The graph-resident differential policy fixes the comparison as
+  |`observable-state-root` between `ceskr` and `deltanet-independent` and fails
+  |closed on any other policy. The independent path is selected explicitly even
+  |though the successor graph also contains F9's parallel scheduler, so the
+  |certificate cannot silently change executors. Certification is restricted to
+  |graph-declared witness programs; the AsyncProcesses async and wakeup programs are
+  |the two frozen witnesses.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |DifferentialCertificates.delta
+  |20fe2af912ddaf1557ea7eaf88faf8087d42b3880f4babec1c207644c2eb8e33
+  |
+  |DifferentialCertificates root
+  |f366454f1723de1ae5fbdb0ebaa94fd2b99bd1d99ab8875bba3a35eb6aa339a4
+  |
+  |708 nodes
+  |783 edges
+  |708 entities
+  |16 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "deltanet-lowering"
+  assert "introduces" "differential-certificates.schema" "optimization.schema"
+depends "deltanet-lowering"
+  entity "differential-certificates.schema" "optimization.schema"
+    attr "extends" "DeltaNetLowering"
+    attr "feature" "ceskr-deltanet-differential"
+    attr "name" "DifferentialCertificates"
+  components "optimization.component" "DifferentialCertificates"
+    component "differential-certificate" "DifferentialCertificate"
+    component "observable-root" "ObservableRoot"
+  rules "optimization.rule"
+    rule "differential-shared-input" "shared-input" "decode-program-once"
+    rule "differential-observable-equality" "observable-equality" "compare-observable-state-roots"
+  entity "optimization.differential.policy" "optimization.differential-policy"
+    attr "comparison" "observable-state-root"
+    attr "failure" "strict"
+    attr "left" "ceskr"
+    attr "right" "deltanet-independent"
+  entity "optimization.differential.async" "optimization.differential-witness"
+    attr "program" "process.bool0.async-program"
+  entity "optimization.differential.wakeup" "optimization.differential-witness"
+    attr "program" "process.bool0.wakeup-program"
