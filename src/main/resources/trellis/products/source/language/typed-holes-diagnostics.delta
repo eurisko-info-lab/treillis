@@ -1,0 +1,389 @@
+delta-change "typed-holes-diagnostics"
+message "TypedHoleDiagnostics: typed holes bounded parse recovery and source diagnostics"
+author "ai"
+doc "guide" """
+  |# TypedHoleDiagnostics: typed holes, bounded recovery, and diagnostics
+  |
+  |TypedHoleDiagnostics is a post-constitution product delta layered over StatementSuites. It does
+  |not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Purpose
+  |
+  |StatementSuites gives Trellis a fully graph-defined, recursively nestable offside
+  |syntax. TypedHoleDiagnostics adds the minimum front-end structure needed for incomplete
+  |source and interactive editing without weakening the ordinary compiler parser.
+  |
+  |The central distinction is:
+  |
+  |```text
+  |strict parse     invalid source -> failure
+  |recovering parse invalid source -> graph-authorized edit -> typed AST + diagnostic
+  |```
+  |
+  |Strict parsing remains fail-closed.
+  |
+  |## Typed holes
+  |
+  |A hole is a first-class grammar expression rather than a special parser return
+  |value:
+  |
+  |```text
+  |grammar.hole
+  |  surface = "?"
+  |  sort    -> Expr
+  |```
+  |
+  |Bool0 adds the ordinary constructor `language.bool0.ctor.Hole : Expr` and a
+  |normal atom production whose body is the hole expression. Therefore `?` is
+  |valid explicit incomplete syntax and prints canonically as `?`.
+  |
+  |Because hole surface text is graph data, changing `?` to `??` through the free
+  |change language changes both strict parsing and recovery insertion without host
+  |parser changes.
+  |
+  |## Recovery policy
+  |
+  |`grammar.bool0.recovery` selects a bounded strategy graph:
+  |
+  |```text
+  |max-edits            = 1
+  |selection            = unique-edit
+  |candidate-boundaries = real-token-ends
+  |failure               = strict
+  |strategy01            -> grammar.recovery.strategy.insert-hole
+  |hole                  -> grammar.bool0.g11.hole.body
+  |```
+  |
+  |The TypedHoleDiagnostics recovery API first runs the normal strict parser. Only after that
+  |fails may it try the selected recovery strategy. A recovery result is accepted
+  |only when exactly one authorized edit yields a complete tree.
+  |
+  |TypedHoleDiagnostics deliberately does not add arbitrary token deletion, insertion of
+  |ordinary syntax, or error productions. Those can be later recovery strategies
+  |if they can be made equally explicit and bounded.
+  |
+  |## Diagnostics
+  |
+  |Recovery produces a stable graph-selected diagnostic:
+  |
+  |```text
+  |severity -> diagnostic.severity.error
+  |code     -> diagnostic.code.inserted-hole
+  |offsets  = UTF-8 bytes
+  |expected = sort-name
+  |```
+  |
+  |A recovered `true&&` therefore has a zero-width diagnostic span at byte 6 and
+  |an expected item of `Expr`.
+  |
+  |For Unicode source such as `π&&`, the insertion span is `[4,4)`, because `π`
+  |occupies two UTF-8 bytes.
+  |
+  |## Recovery result
+  |
+  |The host exposes the graph interpretation as:
+  |
+  |```scala
+  |RecoveredParse(
+  |  tree: Tree,
+  |  diagnostics: Vector[ParseDiagnostic],
+  |  edits: Vector[RecoveryEdit]
+  |)
+  |```
+  |
+  |For valid source, `parseRecovering` returns the exact strict tree and empty
+  |`diagnostics`/`edits`.
+  |
+  |For incomplete source:
+  |
+  |```text
+  |source:    true&&
+  |strict:    failure
+  |recovered: true && ?
+  |```
+  |
+  |The tree is an ordinary `And(True, Hole)` tree. The hole is not an out-of-band
+  |marker.
+  |
+  |## Layout composition
+  |
+  |Recovery candidates are inserted into source and then passed through the same
+  |StatementSuites lexer, layout generator, and suite parser. This makes recovery compose
+  |with nested suites without a separate layout recovery path. For example:
+  |
+  |```text
+  |block
+  |  true
+  |  !
+  |```
+  |
+  |can recover to a block whose second item is `Not(Hole)`.
+  |
+  |## Invariants
+  |
+  |TypedHoleDiagnostics tests enforce:
+  |
+  |1. canonical StatementSuites + TypedHoleDiagnostics.delta derivation,
+  |2. first-class hole/recovery/diagnostic vocabulary,
+  |3. explicit holes parse under the strict parser,
+  |4. incomplete infix recovery inserts one typed hole,
+  |5. diagnostics use UTF-8 byte offsets,
+  |6. recovery composes with recursive layout suites,
+  |7. complete StatementSuites programs remain observationally identical,
+  |8. DeltaBool0 can evolve the hole surface,
+  |9. invalid recovery policy edits fail closed,
+  |10. TypedHoleDiagnostics remains outside F0-F11 and all earlier product identities.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |TypedHoleDiagnostics.delta
+  |565ccce65b71f353642c49259a5852951dc40c54a68fc780b362ad4f60deb42f
+  |
+  |TypedHoleDiagnostics root
+  |838048c0ad6745b97f01dfd928380c89b1fc2255fe8e03a8c4e2da978840e319
+  |
+  |522 nodes
+  |783 edges
+  |522 entities
+  |104 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "statements-suites"
+  assert "introduces" "grammar.component.hole" "grammar.component"
+depends "statements-suites"
+  entity "grammar.component.hole" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "explicit incomplete syntax represented as an ordinary typed grammar expression"
+    attr "name" "Hole"
+    attr "slice" "TypedHoleDiagnostics"
+  entity "grammar.component.recovery" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares bounded graph-selected parse recovery strategies"
+    attr "name" "Recovery"
+    attr "slice" "TypedHoleDiagnostics"
+  entity "grammar.component.diagnostic" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares graph-selected diagnostic severity and stable codes"
+    attr "name" "Diagnostic"
+    attr "slice" "TypedHoleDiagnostics"
+  entity "grammar.recovery.strategy.insert-hole" "grammar.recovery-strategy"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "insert one explicit hole at a real token boundary and require a unique recovered tree"
+    attr "name" "insert-hole"
+    attr "slice" "TypedHoleDiagnostics"
+  entity "diagnostic.severity.error" "diagnostic.severity"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "error"
+    attr "slice" "TypedHoleDiagnostics"
+  entity "diagnostic.code.inserted-hole" "diagnostic.code"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "a typed hole was inserted to complete an otherwise incomplete parse"
+    attr "name" "inserted-hole"
+    attr "slice" "TypedHoleDiagnostics"
+  entity "typed-hole-diagnostics.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout-token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "suite" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "hole" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "recovery" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "diagnostic" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "StatementSuites recursive suites plus typed holes bounded recovery and source diagnostics"
+    attr "name" "TypedHoleDiagnostics"
+    attr "slice" "TypedHoleDiagnostics"
+  connect "grammar.component.expression" "self" "typed-hole-diagnostics.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "typed-hole-diagnostics.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "typed-hole-diagnostics.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "typed-hole-diagnostics.schema" "sequence" "grammar.component"
+  connect "grammar.component.choice" "self" "typed-hole-diagnostics.schema" "choice" "grammar.component"
+  connect "grammar.component.optional" "self" "typed-hole-diagnostics.schema" "optional" "grammar.component"
+  connect "grammar.component.repeat" "self" "typed-hole-diagnostics.schema" "repeat" "grammar.component"
+  connect "grammar.component.capture" "self" "typed-hole-diagnostics.schema" "capture" "grammar.component"
+  connect "grammar.component.cardinality" "self" "typed-hole-diagnostics.schema" "cardinality" "grammar.component"
+  connect "grammar.component.precedence" "self" "typed-hole-diagnostics.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "typed-hole-diagnostics.schema" "associativity" "grammar.component"
+  connect "grammar.component.token" "self" "typed-hole-diagnostics.schema" "token" "grammar.component"
+  connect "grammar.component.lexer" "self" "typed-hole-diagnostics.schema" "lexer" "grammar.component"
+  connect "grammar.component.source" "self" "typed-hole-diagnostics.schema" "source" "grammar.component"
+  connect "grammar.component.source-map" "self" "typed-hole-diagnostics.schema" "source-map" "grammar.component"
+  connect "grammar.component.layout" "self" "typed-hole-diagnostics.schema" "layout" "grammar.component"
+  connect "grammar.component.layout-token" "self" "typed-hole-diagnostics.schema" "layout-token" "grammar.component"
+  connect "grammar.component.statement-form" "self" "typed-hole-diagnostics.schema" "statement-form" "grammar.component"
+  connect "grammar.component.suite" "self" "typed-hole-diagnostics.schema" "suite" "grammar.component"
+  connect "grammar.component.hole" "self" "typed-hole-diagnostics.schema" "hole" "grammar.component"
+  connect "grammar.component.recovery" "self" "typed-hole-diagnostics.schema" "recovery" "grammar.component"
+  connect "grammar.component.diagnostic" "self" "typed-hole-diagnostics.schema" "diagnostic" "grammar.component"
+  entity "language.bool0.ctor.Hole" "language.constructor"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "Hole"
+    attr "slice" "TypedHoleDiagnostics"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "language.bool0.ctor.Hole" "sort" "language.sort"
+  entity "grammar.bool0.g11.hole.body" "grammar.hole"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g11.hole.body"
+    attr "slice" "TypedHoleDiagnostics"
+    attr "surface" "?"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.g11.hole.body" "sort" "grammar.hole-sort"
+  entity "grammar.bool0.prod.hole" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "5"
+    attr "slice" "TypedHoleDiagnostics"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.hole" "sort" "grammar.sort"
+  connect "language.bool0.ctor.Hole" "self" "grammar.bool0.prod.hole" "constructor" "grammar.constructor"
+  connect "grammar.bool0.g11.hole.body" "self" "grammar.bool0.prod.hole" "body" "grammar.body"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.hole" "precedence" "grammar.precedence"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.hole" "associativity" "grammar.associativity"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.hole" "statement-form" "grammar.statement-form"
+  entity "grammar.bool0.recovery" "grammar.recovery-policy"
+    port "strategy01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "hole" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "candidate-boundaries" "real-token-ends"
+    attr "failure" "strict"
+    attr "language" "language.bool0"
+    attr "max-edits" "1"
+    attr "selection" "unique-edit"
+    attr "slice" "TypedHoleDiagnostics"
+  connect "grammar.recovery.strategy.insert-hole" "self" "grammar.bool0.recovery" "strategy01" "grammar.recovery-strategy"
+  connect "grammar.bool0.g11.hole.body" "self" "grammar.bool0.recovery" "hole" "grammar.recovery-hole"
+  entity "grammar.bool0.diagnostics" "grammar.diagnostic-policy"
+    port "severity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "inserted-hole" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "expected" "sort-name"
+    attr "language" "language.bool0"
+    attr "offset-unit" "utf8-bytes"
+    attr "slice" "TypedHoleDiagnostics"
+  connect "diagnostic.severity.error" "self" "grammar.bool0.diagnostics" "severity" "diagnostic.severity"
+  connect "diagnostic.code.inserted-hole" "self" "grammar.bool0.diagnostics" "inserted-hole" "diagnostic.code"
+  disconnect "source.map.bool0.policy" "self" "grammar.bool0" "source-map" "grammar.source-map"
+  disconnect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "grammar.bool0.prod.block" "self" "grammar.bool0" "p12" "grammar.production"
+  disconnect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "statement-suites.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  disconnect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  disconnect "layout.bool0.policy" "self" "grammar.bool0" "layout" "grammar.layout"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p09" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p10" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p11" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p12" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p13" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "recovery" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "diagnostics" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "diagnostic-model" "source-v11"
+    attr "expression-model" "lexical-v11"
+    attr "language" "language.bool0"
+    attr "layout-model" "suites-v10"
+    attr "lexer-model" "codec-v6"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "layout-canonical"
+    attr "parser" "recoverable-suite-precedence-climbing"
+    attr "printer" "recoverable-suite-graph"
+    attr "recovery-model" "holes-v11"
+    attr "slice" "TypedHoleDiagnostics"
+    attr "source-map-model" "ast-v8"
+    attr "source-model" "provenance-v7"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "graph-lexer"
+  connect "source.map.bool0.policy" "self" "grammar.bool0" "source-map" "grammar.source-map"
+  connect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "grammar.bool0.prod.block" "self" "grammar.bool0" "p12" "grammar.production"
+  connect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  connect "layout.bool0.policy" "self" "grammar.bool0" "layout" "grammar.layout"
+  connect "typed-hole-diagnostics.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "grammar.bool0.prod.hole" "self" "grammar.bool0" "p13" "grammar.production"
+  connect "grammar.bool0.recovery" "self" "grammar.bool0" "recovery" "grammar.recovery"
+  connect "grammar.bool0.diagnostics" "self" "grammar.bool0" "diagnostics" "grammar.diagnostic"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "TypedHoleDiagnostics"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.diagnostic-policy;grammar.hole;grammar.layout-token;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.recovery-policy;grammar.reference;grammar.repeat;grammar.sequence;grammar.suite;grammar.token;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort;layout.policy;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.definition;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.map-policy;source.policy"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "TypedHoleDiagnostics"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.diagnostic-policy;grammar.hole;grammar.layout-token;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.recovery-policy;grammar.reference;grammar.repeat;grammar.sequence;grammar.suite;grammar.token;language.constructor;language.constructor-field;language.sort;layout.policy;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.map-policy;source.policy"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
