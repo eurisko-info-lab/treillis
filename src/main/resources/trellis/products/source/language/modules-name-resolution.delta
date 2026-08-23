@@ -1,0 +1,192 @@
+delta-change "modules-name-resolution"
+message "add graph-resident modules and deterministic name resolution"
+author "bootstrap"
+doc "guide" """
+  |# ModuleNameResolution: modules, namespaces, and deterministic name resolution
+  |
+  |ModuleNameResolution is a post-constitution product delta layered over TypedHoleDiagnostics. It does
+  |not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Purpose
+  |
+  |TypedHoleDiagnostics makes incomplete syntax explicit and recoverable. ModuleNameResolution completes
+  |the semantic-core roadmap slice by adding package/module/name structure as graph
+  |data. Parsing remains observationally identical to TypedHoleDiagnostics; name resolution is
+  |a distinct interpretation of module entities.
+  |
+  |## Module graph
+  |
+  |A module is owned by an object language and has a stable semantic identity:
+  |
+  |```text
+  |module.bool0.prelude
+  |  kind     = language.module
+  |  language = language.bool0
+  |  name     = Prelude
+  |```
+  |
+  |Bool0 has `Prelude` and `Main` modules. Modules are decoded in canonical entity
+  |order, and duplicate names within one language are rejected.
+  |
+  |## Namespaces and bindings
+  |
+  |Bindings select their namespace explicitly:
+  |
+  |```text
+  |binding.bool0.prelude.true
+  |  module     = module.bool0.prelude
+  |  name       = true
+  |  namespace  = value
+  |  target     = language.bool0.ctor.True
+  |  visibility = public
+  |```
+  |
+  |ModuleNameResolution demonstrates separate `value` and `constructor` namespaces. A binding
+  |target must be a live graph entity. Duplicate `(module, namespace, name)` keys,
+  |unknown targets, and unsupported visibility values fail graph validation.
+  |
+  |## Imports
+  |
+  |Imports are either open or qualified:
+  |
+  |```text
+  |Main imports Prelude open
+  |Main imports Prelude qualified as Bool
+  |```
+  |
+  |Therefore `true` resolves through the open import, while `Bool.false` resolves
+  |through the qualified import. Qualified imports require an alias. Cross-module
+  |resolution only exposes public bindings.
+  |
+  |## Resolution policy
+  |
+  |`module.bool0.name-policy` records the selected rules:
+  |
+  |```text
+  |qualification = dot
+  |shadowing     = local-over-import
+  |ambiguity     = reject
+  |visibility    = public-across-modules
+  |cycles        = reject
+  |```
+  |
+  |Local bindings take precedence over open imports. Imported candidates are
+  |deduplicated by semantic target; zero candidates are unresolved and multiple
+  |distinct targets are ambiguous. Open-import cycles fail closed.
+  |
+  |The host result retains both the selected binding and resolution path:
+  |
+  |```scala
+  |ResolvedName(
+  |  reference: String,
+  |  binding: NameBinding,
+  |  path: Vector[EntityId]
+  |)
+  |```
+  |
+  |## Grammar compatibility
+  |
+  |ModuleNameResolution does not add textual productions or alter the TypedHoleDiagnostics recovery
+  |encoding. Complete and recovered Bool0 source therefore parses and prints with
+  |the same trees and diagnostics as TypedHoleDiagnostics. The new layer begins semantic name
+  |interpretation after syntax has selected graph constructors.
+  |
+  |## Invariants
+  |
+  |ModuleNameResolution tests enforce:
+  |
+  |1. canonical TypedHoleDiagnostics + ModuleNameResolution.delta derivation,
+  |2. first-class module/name/import/policy vocabulary,
+  |3. deterministic open and qualified resolution,
+  |4. namespace separation and public visibility,
+  |5. rejection of unresolved and ambiguous names,
+  |6. rejection of duplicate modules and bindings,
+  |7. TypedHoleDiagnostics parsing remains observationally identical,
+  |8. ModuleNameResolution remains outside F0-F11 and all earlier product identities.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |ModuleNameResolution.delta
+  |f919c07bc238fe6e2512d5fb41f964852a6e2d30dae26eb3cfff8324a5628dbb
+  |
+  |ModuleNameResolution root
+  |8c26c291d41ea6ababc5cfd71a94fefa1694cce13f6c256c8a7081f03550a5bd
+  |
+  |536 nodes
+  |783 edges
+  |536 entities
+  |28 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "typed-holes-diagnostics"
+  assert "introduces" "module-name-resolution.schema" "grammar.schema"
+depends "typed-holes-diagnostics"
+  entity "module-name-resolution.schema" "grammar.schema"
+    attr "extends" "TypedHoleDiagnostics"
+    attr "name" "ModuleNameResolution"
+    attr "purpose" "module-and-name-graph"
+  entity "module12.schema" "module.schema"
+    attr "ambiguity" "reject"
+    attr "name" "Module12"
+    attr "resolution" "deterministic"
+  entity "language.component.module" "language.component"
+    attr "description" "graph-resident language module"
+    attr "name" "Module"
+    attr "slice" "ModuleNameResolution"
+  entity "language.component.name-binding" "language.component"
+    attr "description" "namespace-specific semantic binding"
+    attr "name" "NameBinding"
+    attr "slice" "ModuleNameResolution"
+  entity "language.component.module-import" "language.component"
+    attr "description" "open or qualified module import"
+    attr "name" "ModuleImport"
+    attr "slice" "ModuleNameResolution"
+  entity "language.component.name-policy" "language.component"
+    attr "description" "deterministic resolution policy"
+    attr "name" "NamePolicy"
+    attr "slice" "ModuleNameResolution"
+  entity "module.bool0.name-policy" "language.name-policy"
+    attr "ambiguity" "reject"
+    attr "cycles" "reject"
+    attr "language" "language.bool0"
+    attr "qualification" "dot"
+    attr "shadowing" "local-over-import"
+    attr "visibility" "public-across-modules"
+  entity "module.bool0.prelude" "language.module"
+    attr "language" "language.bool0"
+    attr "name" "Prelude"
+  entity "module.bool0.main" "language.module"
+    attr "language" "language.bool0"
+    attr "name" "Main"
+  entity "binding.bool0.prelude.true" "language.name-binding"
+    attr "module" "module.bool0.prelude"
+    attr "name" "true"
+    attr "namespace" "value"
+    attr "target" "language.bool0.ctor.True"
+    attr "visibility" "public"
+  entity "binding.bool0.prelude.false" "language.name-binding"
+    attr "module" "module.bool0.prelude"
+    attr "name" "false"
+    attr "namespace" "value"
+    attr "target" "language.bool0.ctor.False"
+    attr "visibility" "public"
+  entity "binding.bool0.prelude.hole" "language.name-binding"
+    attr "module" "module.bool0.prelude"
+    attr "name" "hole"
+    attr "namespace" "constructor"
+    attr "target" "language.bool0.ctor.Hole"
+    attr "visibility" "public"
+  entity "import.bool0.main.prelude" "language.module-import"
+    attr "imported" "module.bool0.prelude"
+    attr "mode" "open"
+    attr "module" "module.bool0.main"
+  entity "import.bool0.main.prelude-qualified" "language.module-import"
+    attr "alias" "Bool"
+    attr "imported" "module.bool0.prelude"
+    attr "mode" "qualified"
+    attr "module" "module.bool0.main"
