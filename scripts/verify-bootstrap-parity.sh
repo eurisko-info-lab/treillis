@@ -29,7 +29,7 @@ printf '%s\n' '[parity] Rust clean-room reconstruction'
 cargo run --quiet --manifest-path "$RUST_MANIFEST" -- verify --resources "$FOUNDATIONS"
 
 printf '%s\n' '[parity] canonical closure-report bytes'
-sbt --error "run closure" \
+sbt --error "runMain trellis.Main closure" \
   | grep '^14:closure-report' \
   | tail -n 1 \
   > "$TMP/scala-closure.txt"
@@ -44,7 +44,7 @@ if ! cmp -s "$TMP/scala-closure.txt" "$TMP/rust-closure.txt"; then
 fi
 
 printf '%s\n' '[parity] frozen delta ids and F0-F11 roots'
-sbt --error run \
+sbt --error "runMain trellis.Main" \
   | grep -E '^F([0-9]+) (delta|root):' \
   | sed -E 's/[[:space:]]+//g' \
   > "$TMP/scala-roots.txt"
