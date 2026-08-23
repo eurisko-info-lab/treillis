@@ -1,0 +1,63 @@
+delta-change "publication-consensus"
+message "add deterministic publication consensus chain"
+author "bootstrap"
+doc "guide" """
+  |# PublicationConsensus: deterministic publication consensus chain
+  |
+  |PublicationConsensus adds an executable consensus boundary over signed SignedPublications
+  |publications. A finalized block contains a canonical publication-ID sequence,
+  |the previous block identity, its height, and a canonical validator-vote set.
+  |The block identity is the SHA-256 hash of that canonical claim, producing a
+  |tamper-evident chain from the all-zero genesis predecessor.
+  |
+  |Consensus policy and validator membership are graph data. The frozen policy
+  |uses three validators, requires a two-vote quorum, orders publications by
+  |canonical identifier, and grants immediate deterministic finality. Unknown or
+  |duplicate validators, insufficient quorum, unknown publications, replayed
+  |publications, forks, malformed ordering, and modified block links fail closed.
+  |
+  |This remains a deterministic consensus simulation rather than a network
+  |protocol. It specifies proposal admission and final chain verification while
+  |leaving transport, leader election, and Byzantine liveness outside the trusted
+  |bootstrap boundary.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |PublicationConsensus.delta
+  |e009356e82e0b24faac861369b402839e07d55a13e213b6d95cc6a004ad96734
+  |
+  |PublicationConsensus root
+  |b69760db795813eb7d78b17cf05cd98ca6119de9b39fe60e7acea22f64bad6a6
+  |
+  |729 nodes
+  |783 edges
+  |729 entities
+  |12 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "signed-publications"
+  assert "introduces" "publication-consensus.schema" "network.schema"
+depends "signed-publications"
+  entity "publication-consensus.schema" "network.schema"
+    attr "extends" "SignedPublications"
+    attr "feature" "deterministic-consensus-chain"
+    attr "name" "PublicationConsensus"
+  components "network.component" "PublicationConsensus"
+    component "consensus-chain" "ConsensusChain"
+  entity "network.consensus.policy" "network.consensus-policy"
+    attr "failure" "strict"
+    attr "finality" "immediate-quorum"
+    attr "ordering" "canonical-publication-id"
+    attr "quorum" "2"
+  entity "network.consensus.validator.a" "network.consensus-validator"
+    attr "id" "a"
+  entity "network.consensus.validator.b" "network.consensus-validator"
+    attr "id" "b"
+  entity "network.consensus.validator.c" "network.consensus-validator"
+    attr "id" "c"
