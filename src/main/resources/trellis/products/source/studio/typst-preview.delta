@@ -1,0 +1,52 @@
+delta-change "typst-preview"
+message "add semantic Typst document preview"
+author "bootstrap"
+doc "guide" """
+  |# TypstPreview: semantic Typst document preview
+  |
+  |TypstPreview builds a deterministic preview model over the existing noncanonical
+  |Typst projection. Graph policy controls semantic entities per page, one-based
+  |numbering, selection reveal, and strict failure.
+  |
+  |Preview pages retain entity identities and anchors. SemanticSelection synchronized
+  |selection resolves the page containing an entity without changing ordinary
+  |Typst document bytes.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |TypstPreview.delta
+  |4d8351e7bd2c5f788e27c6018ed12d847331bc8590c927974ebde01a60b194b0
+  |
+  |TypstPreview root
+  |ec307a3071cd61e58f127d27e3d59341144b9f6496886127df6405c576f71bb2
+  |
+  |650 nodes
+  |783 edges
+  |650 entities
+  |14 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "interactive-svg"
+  assert "introduces" "typst-preview.schema" "studio.schema"
+depends "interactive-svg"
+  entity "typst-preview.schema" "studio.schema"
+    attr "extends" "InteractiveSvg"
+    attr "feature" "typst-document-preview"
+    attr "name" "TypstPreview"
+  components "studio.component" "TypstPreview"
+    component "typst-preview" "TypstPreview"
+    component "preview-page" "PreviewPage"
+    component "preview-anchor" "PreviewAnchor"
+  rules "studio.rule"
+    rule "preview-pagination" "pagination" "group-semantic-entities-into-pages"
+    rule "preview-selection-reveal" "selection-reveal" "map-selection-to-page"
+  entity "studio.typst.preview-policy" "studio.typst-preview-policy"
+    attr "entities-per-page" "32"
+    attr "failure" "strict"
+    attr "numbering" "one-based"
+    attr "selection" "reveal"
