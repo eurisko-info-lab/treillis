@@ -1,0 +1,61 @@
+delta-change "deltanet-lowering"
+message "add verified optimized DeltaNet lowering"
+author "bootstrap"
+doc "guide" """
+  |# DeltaNetLowering: verified DeltaNet lowering
+  |
+  |DeltaNetLowering lowers the target-selected semantic representative to an existing
+  |DeltaNet agent kind. Rules bind exact operators, preserve every required
+  |invariant, and cite a verified OptimizationLaws law covering that representative.
+  |
+  |Compact and latency selections both lower deterministically to the generic
+  |DeltaNet value agent while retaining their distinct selected operators.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |DeltaNetLowering.delta
+  |5d9e5cf44ef7529429e69f46818d3989fb8f9b635987640997d20f6f13034147
+  |
+  |DeltaNetLowering root
+  |f9a4c9b9445ff000d093b2ae514b4ea85d240d66b74246885b875346a6b8a169
+  |
+  |700 nodes
+  |783 edges
+  |700 entities
+  |18 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "target-extraction"
+  assert "introduces" "deltanet-lowering.schema" "optimization.schema"
+depends "target-extraction"
+  entity "deltanet-lowering.schema" "optimization.schema"
+    attr "extends" "TargetExtraction"
+    attr "feature" "verified-deltanet-lowering"
+    attr "name" "DeltaNetLowering"
+  components "optimization.component" "DeltaNetLowering"
+    component "deltanet-lowering" "DeltaNetLowering"
+    component "lowering-artifact" "LoweringArtifact"
+  rules "optimization.rule"
+    rule "lowering-exact-operator" "exact-operator" "bind-selected-operator"
+    rule "lowering-invariants" "required-invariants" "preserve-required-subset"
+    rule "lowering-evidence" "verified-evidence" "require-verified-law"
+  entity "optimization.lowering.policy" "optimization.lowering-policy"
+    attr "evidence" "verified-law"
+    attr "failure" "strict"
+    attr "invariants" "required-subset"
+    attr "selection" "exact-operator"
+  entity "optimization.lowering.beta-contract" "optimization.deltanet-lowering"
+    attr "agent" "deltanet.agent-kind.value"
+    attr "evidence" "optimization.law.beta"
+    attr "operator" "beta-contract"
+    attr "preserves" "type;resource;effect;protocol"
+  entity "optimization.lowering.beta-redex" "optimization.deltanet-lowering"
+    attr "agent" "deltanet.agent-kind.value"
+    attr "evidence" "optimization.law.beta"
+    attr "operator" "beta-redex"
+    attr "preserves" "type;resource;effect;protocol"
