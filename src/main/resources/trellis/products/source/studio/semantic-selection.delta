@@ -1,0 +1,51 @@
+delta-change "semantic-selection"
+message "add synchronized Studio semantic selection"
+author "bootstrap"
+doc "guide" """
+  |# SemanticSelection: synchronized semantic selection
+  |
+  |SemanticSelection is the first explicitly named tooling product, layered over StudioNavigator.
+  |It resolves entity/node semantic equivalence once and maps the selection into
+  |the semantic marks emitted by Code, SVG, and Typst projections.
+  |
+  |The graph policy selects the participating views, entity-node equivalence,
+  |visibility behavior, and strict failure. Unknown selections, missing views, and
+  |unsupported policy edits fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |SemanticSelection.delta
+  |9fa981f41d872febe5f218e7cc753a382a70da3935ab71e8b898e85b233b384f
+  |
+  |SemanticSelection root
+  |03551a531e97541292970118c6954c07a059580d61408feb907d9ab547753675
+  |
+  |637 nodes
+  |783 edges
+  |637 entities
+  |12 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "studio-navigator"
+  assert "introduces" "semantic-selection.schema" "studio.schema"
+depends "studio-navigator"
+  entity "semantic-selection.schema" "studio.schema"
+    attr "extends" "StudioNavigator"
+    attr "feature" "synchronized-semantic-selection"
+    attr "name" "SemanticSelection"
+  components "studio.component" "SemanticSelection"
+    component "synchronized-selection" "SynchronizedSelection"
+    component "view-binding" "ViewBinding"
+  rules "studio.rule"
+    rule "selection-equivalence" "entity-node-equivalence" "resolve-semantic-aliases"
+    rule "selection-marks" "selection-marks" "map-selection-to-rendered-identifiers"
+  entity "studio.selection.policy" "studio.selection-policy"
+    attr "failure" "strict"
+    attr "identity" "entity-node-equivalence"
+    attr "views" "projection.code;projection.svg;projection.typst"
+    attr "visibility" "allow-hidden"
