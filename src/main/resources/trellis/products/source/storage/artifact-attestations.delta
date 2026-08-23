@@ -1,0 +1,65 @@
+delta-change "artifact-attestations"
+message "add reproducible builder artifact attestations"
+author "bootstrap"
+doc "guide" """
+  |# ArtifactAttestations: reproducible builder and artifact attestations
+  |
+  |ArtifactAttestations completes the initial global-network roadmap with a reproducible build
+  |boundary. A build accepts only the latest finalized signed publication, reads
+  |and decodes its canonical graph from replicated CAS, executes the frozen
+  |`canonical-graph-manifest-v1` recipe, and stores the exact artifact bytes back
+  |into CAS.
+  |
+  |The resulting Ed25519 attestation binds publication identity, source graph
+  |root, builder identity, recipe, and artifact content identity. Its signature is
+  |part of the canonical attestation record and therefore of the attestation's own
+  |SHA-256 identity. Verification independently checks finality, source bytes,
+  |artifact replicas, exact recipe output, builder public key, signature, and
+  |outer identity.
+  |
+  |Builder identity and public key, recipe semantics, source requirements,
+  |reproducibility mode, signature algorithm, and failure behavior are graph data.
+  |Unknown builders, non-finalized sources, missing or corrupt CAS objects,
+  |modified claims, wrong keys, and unsupported policy fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |ArtifactAttestations.delta
+  |fb531395cd5e75ad213426d867455984d7b9b70e005b0cbaa9ae8e7ab6106116
+  |
+  |ArtifactAttestations root
+  |4beb9d334afa572f3afd74d6636813b6c274e6a3a1f544cc2ec9a329d366fa4d
+  |
+  |738 nodes
+  |783 edges
+  |738 entities
+  |10 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "package-discovery"
+  assert "introduces" "artifact-attestations.schema" "network.schema"
+depends "package-discovery"
+  entity "artifact-attestations.schema" "network.schema"
+    attr "extends" "PackageDiscovery"
+    attr "feature" "reproducible-artifact-attestations"
+    attr "name" "ArtifactAttestations"
+  components "network.component" "ArtifactAttestations"
+    component "reproducible-builder" "ReproducibleBuilder"
+    component "artifact-attestation" "ArtifactAttestation"
+  entity "network.attestation.policy" "network.attestation-policy"
+    attr "artifact" "verified-cas-content"
+    attr "failure" "strict"
+    attr "recipe" "canonical-graph-manifest-v1"
+    attr "reproducibility" "exact-bytes"
+    attr "signature" "ed25519"
+    attr "source" "finalized-publication"
+  entity "network.builder.foundation" "network.builder"
+    attr "algorithm" "ed25519"
+    attr "name" "trellis-builder"
+    attr "public-key" "MCowBQYDK2VwAyEA1GfKoUAv61m7euy4pScpE1F8DBAt2wqfKJkK3fofaAM="
