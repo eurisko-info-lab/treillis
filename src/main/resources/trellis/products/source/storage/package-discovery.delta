@@ -1,0 +1,59 @@
+delta-change "package-discovery"
+message "add finalized package discovery and local checkout"
+author "bootstrap"
+doc "guide" """
+  |# PackageDiscovery: finalized package discovery and local checkout
+  |
+  |PackageDiscovery connects the preceding network layers into a user-facing workflow.
+  |Discovery reads only PublicationConsensus-finalized publication identifiers, resolves them
+  |through the signed ledger, selects the latest finalized record per package and
+  |branch, and returns a canonically ordered package index. Admitted but
+  |unfinalized records are deliberately invisible.
+  |
+  |Checkout fetches the selected publication's graph root from DistributedCas's
+  |replicated CAS, verifies every replica and the canonical graph encoding, then
+  |creates a local branch through the existing repository API. The branch starts
+  |with an empty local frontier and records the exact publication, basis root, and
+  |upstream change frontier as provenance.
+  |
+  |The graph-resident policy fixes finalized consensus as the discovery source,
+  |latest-finalized selection, deterministic package/branch ordering, verified
+  |CAS checkout, and strict failure. Missing packages or objects, corrupt graph
+  |bytes, invalid consensus, and unsupported discovery policy fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |PackageDiscovery.delta
+  |7c2461140f34f7a41e5142596e309fda560a82fccfd8044ea2c5d3864f5f2f78
+  |
+  |PackageDiscovery root
+  |31e5f0ad4386ff01b15addc3ab68c63687e44a70d4364f26f6b5a15fa8131cdd
+  |
+  |733 nodes
+  |783 edges
+  |733 entities
+  |8 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "publication-consensus"
+  assert "introduces" "package-discovery.schema" "network.schema"
+depends "publication-consensus"
+  entity "package-discovery.schema" "network.schema"
+    attr "extends" "PublicationConsensus"
+    attr "feature" "package-discovery-and-checkout"
+    attr "name" "PackageDiscovery"
+  components "network.component" "PackageDiscovery"
+    component "package-discovery" "PackageDiscovery"
+    component "publication-checkout" "PublicationCheckout"
+  entity "network.discovery.policy" "network.discovery-policy"
+    attr "checkout" "verified-cas-root"
+    attr "failure" "strict"
+    attr "ordering" "package-branch-publication-id"
+    attr "selection" "latest-finalized"
+    attr "source" "finalized-consensus"
