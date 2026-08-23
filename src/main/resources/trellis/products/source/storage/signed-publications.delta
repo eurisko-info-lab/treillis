@@ -1,0 +1,69 @@
+delta-change "signed-publications"
+message "add signed namespaces publications and frontiers"
+author "bootstrap"
+doc "guide" """
+  |# SignedPublications: signed namespaces, publications, and frontiers
+  |
+  |SignedPublications replaces the simulated PublicationLedger signature marker with Ed25519
+  |publisher authentication. The `trellis` namespace and its
+  |`trellis-foundation` publisher are graph data, including the publisher's X.509
+  |public key and signature algorithm. Private signing keys remain outside the
+  |semantic graph.
+  |
+  |The signed canonical claim binds package namespace, branch, sorted change
+  |frontier, graph root, and publisher identity. The signature is then included
+  |in the canonical publication record and therefore in the publication's own
+  |SHA-256 identity. Changing any claim field invalidates the signature even when
+  |an attacker recomputes the outer publication identifier.
+  |
+  |Admission remains append-only and fail-closed. Unknown publishers, malformed
+  |keys or signatures, unsupported algorithms, forged claims, duplicate records,
+  |and namespace violations are rejected before ledger mutation. PublicationLedger's
+  |simulated ledger and DistributedCas's replicated CAS remain reproducible predecessor
+  |graphs.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |SignedPublications.delta
+  |d9251b83a88dd3d5b1af4b3697800c0d99963cb58e13e0acf2975432197979a5
+  |
+  |SignedPublications root
+  |9d1de7ba4eee0e3ccf6b93f994a4927505e54452e0a1eb745f2d89a5b9d4d683
+  |
+  |723 nodes
+  |783 edges
+  |723 entities
+  |9 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "distributed-cas"
+  assert "introduces" "signed-publications.schema" "network.schema"
+depends "distributed-cas"
+  entity "signed-publications.schema" "network.schema"
+    attr "extends" "DistributedCas"
+    attr "feature" "signed-publications-frontiers"
+    attr "name" "SignedPublications"
+  components "network.component" "SignedPublications"
+    component "publisher-identity" "PublisherIdentity"
+    component "signed-frontier" "SignedFrontier"
+  replace "network.ledger.policy" "network.ledger-policy"
+    attr "claim" "package-branch-frontier-root-publisher"
+    attr "duplicate" "reject"
+    attr "failure" "strict"
+    attr "identity" "canonical-sha256"
+    attr "ordering" "append-only"
+    attr "signature" "ed25519"
+  replace "network.namespace.trellis" "network.namespace"
+    attr "authority" "signed-publisher"
+    attr "prefix" "trellis"
+  replace "network.publisher.foundation" "network.publisher"
+    attr "algorithm" "ed25519"
+    attr "name" "trellis-foundation"
+    attr "namespace" "trellis"
+    attr "public-key" "MCowBQYDK2VwAyEA1GfKoUAv61m7euy4pScpE1F8DBAt2wqfKJkK3fofaAM="
