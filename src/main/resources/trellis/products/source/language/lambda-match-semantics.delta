@@ -1,0 +1,207 @@
+delta-change "lambda-match-semantics"
+message "add graph-defined lambda apply construct and match semantics"
+author "bootstrap"
+doc "guide" """
+  |# LambdaMatchSemantics: graph-defined lambda, apply, construct, and match
+  |
+  |LambdaMatchSemantics is a post-constitution product delta layered over ModuleNameResolution. It does
+  |not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Purpose
+  |
+  |ModuleNameResolution completes the self-describing semantic core with modules and names.
+  |LambdaMatchSemantics begins the reference-language semantics roadmap by making four core
+  |expression forms and their evaluation policy graph data:
+  |
+  |```text
+  |lambda(parameter, body)
+  |apply(function, argument)
+  |construct(constructor, fields)
+  |match(scrutinee, ordered cases)
+  |```
+  |
+  |This layer does not add processes, channels, sessions, CESK-R transition graphs,
+  |or deterministic traces. Those remain separate later layers.
+  |
+  |## Expression graph
+  |
+  |Semantic expressions are stable graph entities owned by an object language.
+  |References name lexical environment entries. Lambdas name a parameter and body;
+  |application names function and argument expressions. Constructors name an
+  |existing `language.constructor` and canonically ordered field expressions.
+  |
+  |The frozen Bool0 witness includes:
+  |
+  |```text
+  |expr.bool0.identity       = lambda x -> x
+  |expr.bool0.identity-true  = identity(true)
+  |expr.bool0.flip-true      = match identity(true) with
+  |                              True  -> false
+  |                              False -> true
+  |```
+  |
+  |## Values and environments
+  |
+  |The host exposes only the generic interpretation result:
+  |
+  |```scala
+  |enum SemanticValue:
+  |  case Data(constructor, fields)
+  |  case Closure(parameter, body, environment)
+  |
+  |EvaluationResult(value, steps)
+  |```
+  |
+  |A lambda evaluates to a closure over the current lexical environment.
+  |Application evaluates the function and argument before extending the captured
+  |environment. Tests use a nested lambda whose result distinguishes lexical
+  |capture from dynamic scope.
+  |
+  |## Constructors and matching
+  |
+  |Constructor fields evaluate left to right in canonical `field01`, `field02`, ...
+  |order. A match first evaluates its scrutinee, requires a data value, and selects
+  |the first ordered case with the same constructor identity. A case may bind the
+  |whole data value before evaluating its body.
+  |
+  |Unknown constructors, malformed field/case ordering, matching a closure, and
+  |non-exhaustive matches fail closed.
+  |
+  |## Evaluation policy
+  |
+  |`semantics.bool0.policy` selects:
+  |
+  |```text
+  |strategy  = call-by-value
+  |scope     = lexical
+  |matching  = first-constructor
+  |failure   = strict
+  |max-steps = 256
+  |```
+  |
+  |The interpreter decodes this node before evaluation. Unsupported policy edits,
+  |missing or multiple policies, cross-language expressions, unbound references,
+  |application of non-closures, and evaluation beyond the graph-selected bound all
+  |fail closed.
+  |
+  |## Graph-defined rules
+  |
+  |The product graph contains explicit rule identities for the behavior interpreted
+  |by the bootstrap host:
+  |
+  |```text
+  |semantics.rule.beta-value
+  |semantics.rule.construct-value
+  |semantics.rule.match-constructor
+  |```
+  |
+  |LambdaMatchSemantics admission requires these rules, the semantic component vocabulary,
+  |the policy, and successful evaluation of both frozen Bool0 witnesses.
+  |
+  |## Grammar compatibility
+  |
+  |LambdaMatchSemantics does not alter textual productions, lexing, layout, recovery, modules,
+  |or name resolution. ModuleNameResolution source therefore parses and prints identically.
+  |This layer evaluates semantic expression entities after syntax and naming.
+  |
+  |## Invariants
+  |
+  |LambdaMatchSemantics tests enforce:
+  |
+  |1. canonical ModuleNameResolution + LambdaMatchSemantics.delta derivation,
+  |2. first-class expression, value, environment, policy, and rule vocabulary,
+  |3. call-by-value lambda application,
+  |4. lexical closure capture,
+  |5. constructor creation and ordered matching,
+  |6. rejection of unsupported policy and non-exhaustive matches,
+  |7. ModuleNameResolution parsing remains observationally identical,
+  |8. LambdaMatchSemantics remains outside F0-F11 and all earlier product identities.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |LambdaMatchSemantics.delta
+  |1a21027f71185847fcc0e959d879f47f7515c1d9bb443388c7a2f54ef7e04600
+  |
+  |LambdaMatchSemantics root
+  |05ffaf82cf7f9e5d9599188c1bbe99a8ebdae92b0065930de946826578e331a8
+  |
+  |558 nodes
+  |783 edges
+  |558 entities
+  |44 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "modules-name-resolution"
+  assert "introduces" "lambda-match-semantics.schema" "grammar.schema"
+depends "modules-name-resolution"
+  entity "lambda-match-semantics.schema" "grammar.schema"
+    attr "extends" "ModuleNameResolution"
+    attr "name" "LambdaMatchSemantics"
+    attr "purpose" "reference-expression-semantics"
+  entity "semantics13.schema" "semantics.schema"
+    attr "name" "Semantics13"
+    attr "strategy" "small-step-bounded"
+  components "language.component" "LambdaMatchSemantics"
+    component "semantic-expression" "SemanticExpression"
+  components "semantics.component" "LambdaMatchSemantics"
+    component "lambda" "Lambda"
+    component "apply" "Apply"
+    component "construct" "Construct"
+    component "match" "Match"
+    component "environment" "Environment"
+    component "value" "Value"
+    component "evaluation-policy" "EvaluationPolicy"
+  entity "semantics.rule.beta-value" "semantics.rule"
+    attr "effect" "extend-closure-environment"
+    attr "form" "apply-lambda"
+    attr "name" "beta-value"
+  entity "semantics.rule.construct-value" "semantics.rule"
+    attr "effect" "evaluate-fields-left-to-right"
+    attr "form" "construct"
+    attr "name" "construct-value"
+  entity "semantics.rule.match-constructor" "semantics.rule"
+    attr "effect" "select-first-constructor-case"
+    attr "form" "match"
+    attr "name" "match-constructor"
+  entity "semantics.bool0.policy" "language.evaluation-policy"
+    attr "failure" "strict"
+    attr "language" "language.bool0"
+    attr "matching" "first-constructor"
+    attr "max-steps" "256"
+    attr "scope" "lexical"
+    attr "strategy" "call-by-value"
+  entity "expr.bool0.ref.x" "language.expr.reference"
+    attr "language" "language.bool0"
+    attr "name" "x"
+  entity "expr.bool0.identity" "language.expr.lambda"
+    attr "body" "expr.bool0.ref.x"
+    attr "language" "language.bool0"
+    attr "parameter" "x"
+  entity "expr.bool0.true" "language.expr.construct"
+    attr "constructor" "language.bool0.ctor.True"
+    attr "language" "language.bool0"
+  entity "expr.bool0.false" "language.expr.construct"
+    attr "constructor" "language.bool0.ctor.False"
+    attr "language" "language.bool0"
+  entity "expr.bool0.identity-true" "language.expr.apply"
+    attr "argument" "expr.bool0.true"
+    attr "function" "expr.bool0.identity"
+    attr "language" "language.bool0"
+  entity "case.bool0.true-to-false" "language.match-case"
+    attr "body" "expr.bool0.false"
+    attr "constructor" "language.bool0.ctor.True"
+    attr "language" "language.bool0"
+  entity "case.bool0.false-to-true" "language.match-case"
+    attr "body" "expr.bool0.true"
+    attr "constructor" "language.bool0.ctor.False"
+    attr "language" "language.bool0"
+  entity "expr.bool0.flip-true" "language.expr.match"
+    attr "case01" "case.bool0.true-to-false"
+    attr "case02" "case.bool0.false-to-true"
+    attr "language" "language.bool0"
+    attr "scrutinee" "expr.bool0.identity-true"
