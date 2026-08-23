@@ -1,0 +1,51 @@
+delta-change "lsp-adapter"
+message "add semantic LSP document adapter"
+author "bootstrap"
+doc "guide" """
+  |# LspAdapter: semantic LSP adapter
+  |
+  |LspAdapter completes the deferred Studio integration by adapting the semantic Code
+  |View into a deterministic language-server document. The virtual document URI
+  |binds the complete graph root, its text is the existing Code projection, and
+  |its symbols map semantic entity identities to zero-based LSP positions.
+  |
+  |Definition lookup resolves an entity to its exact Code View anchor. Document
+  |source, position encoding, symbol identity, definition behavior, and strict
+  |failure remain graph policy. Missing symbols and unsupported policy fail
+  |closed; the adapter never promotes projected text into canonical source.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |LspAdapter.delta
+  |b660390de496a8a2d992fd4ffa9f61522a9666427fc9fdf4996ba0c1073ff092
+  |
+  |LspAdapter root
+  |76ac0d9a1e986a29417546359e782041ffc19a04129ec7ed7cddb77bcdcc7871
+  |
+  |741 nodes
+  |783 edges
+  |741 entities
+  |6 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "artifact-attestations"
+  assert "introduces" "lsp-adapter.schema" "studio.schema"
+depends "artifact-attestations"
+  entity "lsp-adapter.schema" "studio.schema"
+    attr "extends" "ArtifactAttestations"
+    attr "feature" "lsp-adapter"
+    attr "name" "LspAdapter"
+  components "studio.component" "LspAdapter"
+    component "lsp-adapter" "LspAdapter"
+  entity "studio.lsp.policy" "studio.lsp-policy"
+    attr "definition" "exact-anchor"
+    attr "document" "code-view"
+    attr "failure" "strict"
+    attr "positions" "zero-based-utf16"
+    attr "symbols" "semantic-entities"
