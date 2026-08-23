@@ -17,20 +17,6 @@ doc "guide" """
   |entity identity, and strict failure. CeskrTraces completes roadmap Slice C; Studio
   |work begins with the next layer.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |CeskrTraces.delta
-  |39277bdbb84409c1568af1346c2d139657c32b53f6bc5660321376594ce01f4d
-  |
-  |CeskrTraces root
-  |55aa46f619af6e96c15afa54d7d4c7c881dd8943c8a11c20c9791d9a04bd3487
-  |
-  |623 nodes
-  |783 edges
-  |623 entities
-  |16 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

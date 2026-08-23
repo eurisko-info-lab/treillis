@@ -18,21 +18,6 @@ doc "guide" """
   |graph-declared witness programs; the AsyncProcesses async and wakeup programs are
   |the two frozen witnesses.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |DifferentialCertificates.delta
-  |20fe2af912ddaf1557ea7eaf88faf8087d42b3880f4babec1c207644c2eb8e33
-  |
-  |DifferentialCertificates root
-  |f366454f1723de1ae5fbdb0ebaa94fd2b99bd1d99ab8875bba3a35eb6aa339a4
-  |
-  |708 nodes
-  |783 edges
-  |708 entities
-  |16 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

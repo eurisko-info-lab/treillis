@@ -23,21 +23,6 @@ doc "guide" """
   |network products can move behind distributed CAS, real publisher keys, and
   |consensus without changing branch provenance.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |PublicationLedger.delta
-  |62c21c229bb84204804f62e95de684936dee99d033db6b13ee46278486169dae
-  |
-  |PublicationLedger root
-  |f504ea229ceb3e29a8c7316527722563954809727ac430dcf73a31326a4c4e79
-  |
-  |714 nodes
-  |783 edges
-  |714 entities
-  |12 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

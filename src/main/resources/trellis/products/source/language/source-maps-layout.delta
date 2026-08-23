@@ -6,12 +6,7 @@ doc "guide" """
   |
   |SourceMapLayout is the eighth post-constitution grammar product layer. It is derived from the frozen SourceProvenance product graph by a canonical DeltaTrellis change. It is not F12 and does not alter the frozen F0–F11 bootstrap constitution.
   |
-  |## Identities
-  |
-  |- SourceMapLayout delta: `d7f8d8ccfb49a1d0353da18aaf419d4a456824298ef713268823fe4e84cc2016`
-  |- SourceMapLayout root: `f19d5ea4d3531c6f3ccea5877cc4199a15908966722a4ef38ce603ae5151aba4`
-  |- Graph size: 488 nodes, 662 edges, 488 entities
-  |
+
   |## Purpose
   |
   |SourceProvenance established a lossless lexical source envelope with UTF-8 byte spans and preserved trivia. SourceMapLayout builds two independent semantic views over that envelope:

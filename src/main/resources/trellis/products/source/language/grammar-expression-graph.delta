@@ -72,21 +72,7 @@ doc "guide" """
   |
   |Invalid expression edits fail closed. For example, a literal containing whitespace is rejected when the successor graph is revalidated.
   |
-  |## Product identities
-  |
-  |```text
-  |LanguageBootstrap.delta  a9121d11a0a297e6d2d27cad840240c134fbcd1548606bc9ddb504fd20fb16fb
-  |LanguageBootstrap root   2ccc49718f50077ac12648eca2dae87c43543ace14314a799e1247e86bcc1421
-  |
-  |ExpressionGrammar.delta   4628a7b07abfe196b369446f751a261871157fc2f99e214b97bacc11fbaa4ee9
-  |ExpressionGrammar root    75d0c77a6a20b7d3a1c039e326ad2b6b16e64bd852b923bf6d8d32026869be77
-  |nodes            305
-  |edges            326
-  |entities         305
-  |```
-  |
-  |The frozen constitutional identities F0–F11 and the LanguageBootstrap product identity are unchanged.
-  |
+
   """
 test "canonical delta contract"
   assert "canonical"

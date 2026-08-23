@@ -20,21 +20,6 @@ doc "guide" """
   |transport or availability assumptions; later network products can attach real
   |storage nodes to this boundary.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |DistributedCas.delta
-  |1ca62a00715ab96c46d45e0c16e393faa287093ab6ac22f81121800ea551c891
-  |
-  |DistributedCas root
-  |eebaabcec2051d01d7f5992b4726262940178a4121635c61c66e075f7ebacc0e
-  |
-  |720 nodes
-  |783 edges
-  |720 entities
-  |12 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

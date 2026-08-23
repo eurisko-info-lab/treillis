@@ -127,20 +127,6 @@ doc "guide" """
   |7. LambdaMatchSemantics expression and parsing behavior remains identical,
   |8. AsyncProcesses remains outside F0-F11 and all earlier product identities.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |AsyncProcesses.delta
-  |7dbd59a1210f08e26b2596318391550a676c81ac382eeca3d8a2458031fd3a10
-  |
-  |AsyncProcesses root
-  |92b457e15900ea4889792c5d1fc474e1f7685d98ee917ad4c450cbaf2653502f
-  |
-  |578 nodes
-  |783 edges
-  |578 entities
-  |40 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

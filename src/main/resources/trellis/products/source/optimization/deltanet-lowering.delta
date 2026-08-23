@@ -11,20 +11,6 @@ doc "guide" """
   |Compact and latency selections both lower deterministically to the generic
   |DeltaNet value agent while retaining their distinct selected operators.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |DeltaNetLowering.delta
-  |5d9e5cf44ef7529429e69f46818d3989fb8f9b635987640997d20f6f13034147
-  |
-  |DeltaNetLowering root
-  |f9a4c9b9445ff000d093b2ae514b4ea85d240d66b74246885b875346a6b8a169
-  |
-  |700 nodes
-  |783 edges
-  |700 entities
-  |18 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

@@ -61,20 +61,6 @@ doc "guide" """
   |deterministic rule ordering, witness value parity, fail-closed malformed rules,
   |SessionProtocols session compatibility, and frozen F0-F11 identity.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |CeskrTransitions.delta
-  |a5e999f9701804b43c77e39860d21ebd7d5bca98bfeae715d7564796b11e1cb0
-  |
-  |CeskrTransitions root
-  |c108a619ff980490e7d502dd8d038b422438e9698876ae2a65e5f20307d9ef08
-  |
-  |615 nodes
-  |783 edges
-  |615 entities
-  |28 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

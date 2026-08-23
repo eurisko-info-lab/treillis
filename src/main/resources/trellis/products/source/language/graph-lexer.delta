@@ -8,13 +8,7 @@ doc "guide" """
   |from the immutable TypedCaptures product graph by one canonical DeltaTrellis change.
   |It is **not** F12 and does not modify the frozen F0-F11 bootstrap constitution.
   |
-  |## Identity
-  |
-  |- TypedCaptures root: `c636319db67af7225fcdc617e2346fc60698992e9766393ae75441241dd55728`
-  |- GraphLexer delta: `ff0a29e9f7871044896fe6c7931976c4a0c37babba8f8e689457fc1e3139ffc0`
-  |- GraphLexer root: `02b13b975e32e0b4cc11b6a0bb4db6a711398e60975dc61338bd5e90ee24303c`
-  |- Materialized graph: 398 nodes, 477 edges, 398 entities
-  |
+
   |## Purpose
   |
   |TemplateGrammar through TypedCaptures interpret grammar semantics from Trellis data, but

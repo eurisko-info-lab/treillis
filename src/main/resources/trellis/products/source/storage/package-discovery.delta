@@ -21,21 +21,6 @@ doc "guide" """
   |CAS checkout, and strict failure. Missing packages or objects, corrupt graph
   |bytes, invalid consensus, and unsupported discovery policy fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |PackageDiscovery.delta
-  |7c2461140f34f7a41e5142596e309fda560a82fccfd8044ea2c5d3864f5f2f78
-  |
-  |PackageDiscovery root
-  |31e5f0ad4386ff01b15addc3ab68c63687e44a70d4364f26f6b5a15fa8131cdd
-  |
-  |733 nodes
-  |783 edges
-  |733 entities
-  |8 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

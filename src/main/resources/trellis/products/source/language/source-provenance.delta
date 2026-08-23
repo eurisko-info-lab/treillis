@@ -7,13 +7,7 @@ doc "guide" """
   |SourceProvenance is the first source-preserving layer above LexicalCodecs. It is a product
   |slice, not a new bootstrap foundation. F0-F11 remain frozen.
   |
-  |## Identity
-  |
-  |- predecessor: LexicalCodecs
-  |- delta: `256ca4fb85cace93ff2580cb0837be48ad40564751e178f4eba0bc33b56b6196`
-  |- root: `3e84ee39aa514ff2ff96dd27c35e6a8c6df3b4619d34fb24a926de4d810287fb`
-  |- graph size: 473 nodes, 624 edges, 473 entities
-  |
+
   |## Purpose
   |
   |LexicalCodecs separates token recognition from semantic lexical values. SourceProvenance

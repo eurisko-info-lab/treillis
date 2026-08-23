@@ -74,18 +74,7 @@ doc "guide" """
   |
   |`Bootstrap.graph` remains exactly the frozen F11 graph.
   |
-  |## Frozen slice identities
-  |
-  |```text
-  |LanguageBootstrap.delta  a9121d11a0a297e6d2d27cad840240c134fbcd1548606bc9ddb504fd20fb16fb
-  |LanguageBootstrap root   2ccc49718f50077ac12648eca2dae87c43543ace14314a799e1247e86bcc1421
-  |nodes            291
-  |edges            309
-  |entities         291
-  |```
-  |
-  |These identities are product-slice identities, not new foundation identities.
-  |
+
   """
 test "canonical delta contract"
   assert "canonical"

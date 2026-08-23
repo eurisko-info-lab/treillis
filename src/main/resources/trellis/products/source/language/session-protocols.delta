@@ -122,20 +122,6 @@ doc "guide" """
   |7. AsyncProcesses processes and LambdaMatchSemantics expressions remain identical,
   |8. SessionProtocols remains outside F0-F11 and all earlier product identities.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |SessionProtocols.delta
-  |d6168950cbb1c7e073492206d5be70e02f685053cf5de65259796f80992f6573
-  |
-  |SessionProtocols root
-  |f567954e80365bb45a214e384e44e64010ff56f15571c0c4c12dfe3b352d9a2e
-  |
-  |601 nodes
-  |783 edges
-  |601 entities
-  |46 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

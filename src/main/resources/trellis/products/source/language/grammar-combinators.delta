@@ -16,18 +16,6 @@ doc "guide" """
   |  + GrammarCombinators.delta  = GrammarCombinators
   |```
   |
-  |Frozen GrammarCombinators identities:
-  |
-  |```text
-  |GrammarCombinators.delta
-  |5ae5cc99da3faca6fda8868547d617cdba400d37c96e0a0aea389d9d6d137eee
-  |
-  |GrammarCombinators root
-  |c000ed72cf1fe773add80a64adb2aa655b0ce0b528d3c4113b01e6c041825d05
-  |```
-  |
-  |The derived graph contains 355 nodes, 390 edges, and 355 entities.
-  |
   |## Purpose
   |
   |ExpressionGrammar removed the embedded `lit:...;ref:...` production mini-language. GrammarCombinators makes the expression graph itself more useful by adding:

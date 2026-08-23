@@ -22,21 +22,6 @@ doc "guide" """
   |Unknown builders, non-finalized sources, missing or corrupt CAS objects,
   |modified claims, wrong keys, and unsupported policy fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |ArtifactAttestations.delta
-  |fb531395cd5e75ad213426d867455984d7b9b70e005b0cbaa9ae8e7ab6106116
-  |
-  |ArtifactAttestations root
-  |4beb9d334afa572f3afd74d6636813b6c274e6a3a1f544cc2ec9a329d366fa4d
-  |
-  |738 nodes
-  |783 edges
-  |738 entities
-  |10 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

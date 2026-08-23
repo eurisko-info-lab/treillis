@@ -21,21 +21,6 @@ doc "guide" """
   |leaving transport, leader election, and Byzantine liveness outside the trusted
   |bootstrap boundary.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |PublicationConsensus.delta
-  |e009356e82e0b24faac861369b402839e07d55a13e213b6d95cc6a004ad96734
-  |
-  |PublicationConsensus root
-  |b69760db795813eb7d78b17cf05cd98ca6119de9b39fe60e7acea22f64bad6a6
-  |
-  |729 nodes
-  |783 edges
-  |729 entities
-  |12 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

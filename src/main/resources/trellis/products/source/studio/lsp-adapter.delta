@@ -14,21 +14,6 @@ doc "guide" """
   |failure remain graph policy. Missing symbols and unsupported policy fail
   |closed; the adapter never promotes projected text into canonical source.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |LspAdapter.delta
-  |b660390de496a8a2d992fd4ffa9f61522a9666427fc9fdf4996ba0c1073ff092
-  |
-  |LspAdapter root
-  |76ac0d9a1e986a29417546359e782041ffc19a04129ec7ed7cddb77bcdcc7871
-  |
-  |741 nodes
-  |783 edges
-  |741 entities
-  |6 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

@@ -13,18 +13,6 @@ doc "guide" """
   |GraphLexer + LexicalExpressions.delta = LexicalExpressions
   |```
   |
-  |Frozen identities:
-  |
-  |```text
-  |LexicalExpressions.delta
-  |c27fbb314a482a71226bde3a249c2212be7ee6d26f4ee87e6ba9f1216b9975eb
-  |
-  |LexicalExpressions root
-  |3bfb6533b24369b04af9a0114355bd5805ab2fa987d410034f922e9a093fa4a3
-  |```
-  |
-  |The resulting graph contains 444 nodes, 561 edges, and 444 entities.
-  |
   |## Purpose
   |
   |GraphLexer made tokenization graph-selected, but its token vocabulary was still

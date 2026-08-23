@@ -104,20 +104,6 @@ doc "guide" """
   |7. TypedHoleDiagnostics parsing remains observationally identical,
   |8. ModuleNameResolution remains outside F0-F11 and all earlier product identities.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |ModuleNameResolution.delta
-  |f919c07bc238fe6e2512d5fb41f964852a6e2d30dae26eb3cfff8324a5628dbb
-  |
-  |ModuleNameResolution root
-  |8c26c291d41ea6ababc5cfd71a94fefa1694cce13f6c256c8a7081f03550a5bd
-  |
-  |536 nodes
-  |783 edges
-  |536 entities
-  |28 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

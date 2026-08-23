@@ -8,22 +8,7 @@ doc "guide" """
   |
   |SourceMapLayout already derives deterministic `NEWLINE`, `INDENT`, and `DEDENT` events from the lossless source substrate. VirtualLayout closes the remaining semantic gap: those virtual events become ordinary first-class grammar expressions that the generic parser can consume.
   |
-  |## Product identity
-  |
-  |```text
-  |VirtualLayout.delta
-  |4495bf6b9f2ff702344779733f55558bd2fdefd4790ae8621d51baa978ee1500
-  |
-  |VirtualLayout root
-  |ff5505a8002973392efc9a9caa6d8c34b39dab85bc6669e9d509ed79544b273b
-  |
-  |503 nodes
-  |707 edges
-  |503 entities
-  |```
-  |
-  |VirtualLayout depends exactly on SourceMapLayout.
-  |
+
   |## Virtual layout terminals are graph entities
   |
   |VirtualLayout adds `grammar.layout-token` expressions. They do not contain textual spellings such as `"INDENT"`; instead each expression points to one of the layout-token entities introduced by SourceMapLayout:

@@ -15,21 +15,6 @@ doc "guide" """
   |projection files are required. Attributes can optionally be expanded as
   |`core.attribute` leaf nodes in the Graph and SVG workspace views.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |FibonacciWorkspace.delta
-  |3d75aa4998b4fa644bbd1db09021e3760ecf96bb338df5dbc291502c573ae9d6
-  |
-  |FibonacciWorkspace root
-  |a6cce0d8f88f55b4800f82c31b91752b45b12b29e6d45e05da4ac6a048dc129b
-  |
-  |766 nodes
-  |807 edges
-  |766 entities
-  |74 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

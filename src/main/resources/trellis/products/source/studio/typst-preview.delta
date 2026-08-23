@@ -12,20 +12,6 @@ doc "guide" """
   |selection resolves the page containing an entity without changing ordinary
   |Typst document bytes.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |TypstPreview.delta
-  |4d8351e7bd2c5f788e27c6018ed12d847331bc8590c927974ebde01a60b194b0
-  |
-  |TypstPreview root
-  |ec307a3071cd61e58f127d27e3d59341144b9f6496886127df6405c576f71bb2
-  |
-  |650 nodes
-  |783 edges
-  |650 entities
-  |14 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

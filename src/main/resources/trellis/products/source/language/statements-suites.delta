@@ -8,22 +8,7 @@ doc "guide" """
   |
   |VirtualLayout made virtual `NEWLINE`, `INDENT`, and `DEDENT` events consumable by ordinary graph grammar expressions. Its flat block example deliberately left one boundary open: a parent suite encoded every item as `Expr NEWLINE`, but a nested block already consumes the newline before its closing `DEDENT`. StatementSuites makes that ownership explicit rather than adding a parser preference.
   |
-  |## Product identity
-  |
-  |```text
-  |StatementSuites.delta
-  |1f159029e12316341d1b1bb17b9fcbbf6649cd0b352bfc0a113234f623b949ec
-  |
-  |StatementSuites root
-  |d13140f3ccda4f625276b1996a6d20aae82e5142d64d717b573b11f2696fbc3d
-  |
-  |510 nodes
-  |746 edges
-  |510 entities
-  |```
-  |
-  |StatementSuites depends exactly on VirtualLayout.
-  |
+
   |## Statement form is graph data
   |
   |Each production now has a typed `grammar.statement-form` edge to one of two first-class entities:

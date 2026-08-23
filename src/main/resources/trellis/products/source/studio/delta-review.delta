@@ -12,20 +12,6 @@ doc "guide" """
   |The graph policy selects operation order, content-ID snapshots, semantic impact
   |selections, and strict failure.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |DeltaReview.delta
-  |d77c6ea3e1c84e27f382827f3e2f270fb443a110b4e6ad036d4119ff75450ed7
-  |
-  |DeltaReview root
-  |6503c9578a548682461e37bc971e34dd48dbfca3d6f694e6a03dd35d61e5f60c
-  |
-  |658 nodes
-  |783 edges
-  |658 entities
-  |16 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

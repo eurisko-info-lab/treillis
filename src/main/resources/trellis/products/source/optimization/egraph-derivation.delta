@@ -12,20 +12,6 @@ doc "guide" """
   |type/resource/effect/protocol invariants, and saturation bounds. Unsupported
   |policy and malformed seeds fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |EGraphDerivation.delta
-  |68bdc8c4e76b954afe506fc0fd69eaac78f301360079f107b86d77eb5af1b6db
-  |
-  |EGraphDerivation root
-  |cf9ef2b961d38af833d7fb15a11b891f9fefcf46e4bc3e7ce4dfb1ff1880002e
-  |
-  |673 nodes
-  |783 edges
-  |673 entities
-  |18 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

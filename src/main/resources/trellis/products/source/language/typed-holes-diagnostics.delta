@@ -134,21 +134,6 @@ doc "guide" """
   |9. invalid recovery policy edits fail closed,
   |10. TypedHoleDiagnostics remains outside F0-F11 and all earlier product identities.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |TypedHoleDiagnostics.delta
-  |565ccce65b71f353642c49259a5852951dc40c54a68fc780b362ad4f60deb42f
-  |
-  |TypedHoleDiagnostics root
-  |838048c0ad6745b97f01dfd928380c89b1fc2255fe8e03a8c4e2da978840e319
-  |
-  |522 nodes
-  |783 edges
-  |522 entities
-  |104 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

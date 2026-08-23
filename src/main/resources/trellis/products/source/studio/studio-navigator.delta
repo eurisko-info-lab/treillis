@@ -13,20 +13,6 @@ doc "guide" """
   |center plus deterministic `(depth, relation, selection)` items. Unknown or
   |unsupported selections and policy edits fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |StudioNavigator.delta
-  |0561d63803d61dfa8fe24515cba990bfa61350943443f20294f754bc080793b7
-  |
-  |StudioNavigator root
-  |d7e8d55682cdaae2424491c2355bce85aac72fd522666e4944883d7a6d5931fd
-  |
-  |631 nodes
-  |783 edges
-  |631 entities
-  |16 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

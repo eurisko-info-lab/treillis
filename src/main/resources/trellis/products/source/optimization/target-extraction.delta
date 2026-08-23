@@ -11,20 +11,6 @@ doc "guide" """
   |The compact profile chooses `beta-contract`; the latency profile chooses
   |`beta-redex`. Incomplete profiles and unsupported policy fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |TargetExtraction.delta
-  |c366949903c1f4b54abc34d654df183e57fcc7a928fa140c89e03dd2843550e2
-  |
-  |TargetExtraction root
-  |b9abbf796c732a5f9286fdb73ad759d325689a9d30a993e5cf9ec09c213792e9
-  |
-  |691 nodes
-  |783 edges
-  |691 entities
-  |22 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

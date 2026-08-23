@@ -12,20 +12,6 @@ doc "guide" """
   |laws. Mismatched claims, unknown rules, duplicate laws, and unsupported policy
   |edits fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |OptimizationLaws.delta
-  |6ec25405fd99b5422ee948750dcce5a69762d513c6a639f374ce071b1b8fc477
-  |
-  |OptimizationLaws root
-  |daa6be93c75a659a62d35cd4186cbbc66ab10e3f84e0ffd6f03e7f2e3fa315c4
-  |
-  |680 nodes
-  |783 edges
-  |680 entities
-  |14 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

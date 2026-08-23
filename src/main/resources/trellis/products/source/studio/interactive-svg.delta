@@ -13,20 +13,6 @@ doc "guide" """
   |ARIA selected state, and strict failure. SemanticSelection entity/node equivalence drives
   |the same selected SVG target.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |InteractiveSvg.delta
-  |6818c2330fc2cd434d330a92355e85fc9f7844e5c5f8a80ba66ac5db0d316b51
-  |
-  |InteractiveSvg root
-  |e42699c937ba3a8b27e1b1e1e496443b49fea2b1b4ffa08d472d03645dcb204c
-  |
-  |643 nodes
-  |783 edges
-  |643 entities
-  |12 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

@@ -117,20 +117,6 @@ doc "guide" """
   |7. ModuleNameResolution parsing remains observationally identical,
   |8. LambdaMatchSemantics remains outside F0-F11 and all earlier product identities.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |LambdaMatchSemantics.delta
-  |1a21027f71185847fcc0e959d879f47f7515c1d9bb443388c7a2f54ef7e04600
-  |
-  |LambdaMatchSemantics root
-  |05ffaf82cf7f9e5d9599188c1bbe99a8ebdae92b0065930de946826578e331a8
-  |
-  |558 nodes
-  |783 edges
-  |558 entities
-  |44 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

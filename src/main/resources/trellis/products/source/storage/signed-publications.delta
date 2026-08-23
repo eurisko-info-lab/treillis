@@ -22,21 +22,6 @@ doc "guide" """
   |simulated ledger and DistributedCas's replicated CAS remain reproducible predecessor
   |graphs.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |SignedPublications.delta
-  |d9251b83a88dd3d5b1af4b3697800c0d99963cb58e13e0acf2975432197979a5
-  |
-  |SignedPublications root
-  |9d1de7ba4eee0e3ccf6b93f994a4927505e54452e0a1eb745f2d89a5b9d4d683
-  |
-  |723 nodes
-  |783 edges
-  |723 entities
-  |9 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

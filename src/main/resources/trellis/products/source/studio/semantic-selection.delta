@@ -12,20 +12,6 @@ doc "guide" """
   |visibility behavior, and strict failure. Unknown selections, missing views, and
   |unsupported policy edits fail closed.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |SemanticSelection.delta
-  |9fa981f41d872febe5f218e7cc753a382a70da3935ab71e8b898e85b233b384f
-  |
-  |SemanticSelection root
-  |03551a531e97541292970118c6954c07a059580d61408feb907d9ab547753675
-  |
-  |637 nodes
-  |783 edges
-  |637 entities
-  |12 delta operations
-  |```
   """
 test "canonical delta contract"
   assert "canonical"

@@ -12,21 +12,6 @@ doc "guide" """
   |synchronized selection resolves to the stable line containing the selected
   |entity. LspAdapter later adapts these stable anchors to an LSP document.
   |
-  |## Frozen product identity
-  |
-  |```text
-  |CodeView.delta
-  |7b1cae3f23e31a8d8e8a13f35bbe240de546d2a714b9e6dbdf80c87c8afd75a9
-  |
-  |CodeView root
-  |8cc65a57874b0ea20b1cfc428f56bf53bbe5521709e5b9a360691cb45a7f1aee
-  |
-  |664 nodes
-  |783 edges
-  |664 entities
-  |12 delta operations
-  |```
-  |
   """
 test "canonical delta contract"
   assert "canonical"

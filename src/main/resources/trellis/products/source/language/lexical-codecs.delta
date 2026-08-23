@@ -12,15 +12,6 @@ doc "guide" """
   |LexicalExpressions + LexicalCodecs.delta = LexicalCodecs
   |```
   |
-  |Frozen identities:
-  |
-  |```text
-  |LexicalCodecs.delta = f757ae3ac518c64a50c62063813d46d6be1efb0aed0b9c86e58ab363043a5485
-  |LexicalCodecs root  = d95d6fb30b3377466c6aae6f31b13830806eb3691cef2dab5384c7c3197162e8
-  |```
-  |
-  |The materialized LexicalCodecs graph contains 456 nodes, 595 edges, and 456 entities.
-  |
   |## Purpose
   |
   |LexicalExpressions made lexical recognition graph-resident but lexical AST fields still contained the matched source spelling. LexicalCodecs separates recognition from value semantics:
