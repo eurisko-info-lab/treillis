@@ -1,0 +1,267 @@
+delta-change "graph-lexer"
+message "GraphLexer graph-resident lexer over TypedCaptures"
+author "ai"
+doc "guide" """
+  |# GraphLexer: graph-resident lexical analysis
+  |
+  |GraphLexer is the fourth post-constitution grammar product layer. It is derived
+  |from the immutable TypedCaptures product graph by one canonical DeltaTrellis change.
+  |It is **not** F12 and does not modify the frozen F0-F11 bootstrap constitution.
+  |
+  |## Identity
+  |
+  |- TypedCaptures root: `c636319db67af7225fcdc617e2346fc60698992e9766393ae75441241dd55728`
+  |- GraphLexer delta: `ff0a29e9f7871044896fe6c7931976c4a0c37babba8f8e689457fc1e3139ffc0`
+  |- GraphLexer root: `02b13b975e32e0b4cc11b6a0bb4db6a711398e60975dc61338bd5e90ee24303c`
+  |- Materialized graph: 398 nodes, 477 edges, 398 entities
+  |
+  |## Purpose
+  |
+  |TemplateGrammar through TypedCaptures interpret grammar semantics from Trellis data, but
+  |the host still tokenizes source text by splitting on whitespace. GraphLexer
+  |removes that host convention.
+  |
+  |A GraphLexer grammar selects a first-class lexer through a typed `grammar.lexer`
+  |edge. The Bool0 lexer declares:
+  |
+  |- token source: the grammar's own first-class literal expressions;
+  |- whitespace: Unicode whitespace;
+  |- comment rule: `//` through end of line;
+  |- token selection: longest match;
+  |- deterministic tie break: lexical order;
+  |- word boundary: identifier-like characters may not silently split keywords;
+  |- failure policy: fail closed.
+  |
+  |The host therefore contains a generic scanner, but Bool0's terminals and lexer
+  |policy remain graph data. Changing a grammar literal changes lexical
+  |recognition without changing the scanner.
+  |
+  |## Example
+  |
+  |The same TypedCaptures AST language now accepts punctuation-adjacent source:
+  |
+  |```text
+  |!true&&(false||true)
+  |```
+  |
+  |and canonically prints:
+  |
+  |```text
+  |! true && ( false || true )
+  |```
+  |
+  |Comments and whitespace are likewise lexical policy:
+  |
+  |```text
+  |true&&// comment
+  |(false||!false)
+  |```
+  |
+  |prints as:
+  |
+  |```text
+  |true && ( false || ! false )
+  |```
+  |
+  |## Versioned oracle
+  |
+  |`Language.typed-captures` remains the immutable TypedCaptures graph. `Language.graph`
+  |advances to GraphLexer. TypedCaptures and GraphLexer must produce identical ASTs and
+  |canonical output on the TypedCaptures whitespace-delimited surface.
+  |
+  |## Free changes
+  |
+  |`DeltaBool0` now admits the language-owned lexer definition, token source,
+  |skip rules, and token-selection policy. All such edits still pass complete
+  |language validation. A change that replaces deterministic longest-match
+  |selection with an unsupported policy is rejected before publication.
+  |
+  |## Deliberate boundary
+  |
+  |GraphLexer derives tokens only from grammar literal expressions. It does not yet
+  |provide identifier, numeric, string, escape, or user-defined character-class
+  |lexemes. Those should be added as first-class lexical expressions rather than
+  |as host regex strings.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "typed-captures"
+  assert "introduces" "grammar.component.lexer" "grammar.component"
+depends "typed-captures"
+  entity "grammar.component.lexer" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "graph-resident lexical analysis selected by a grammar"
+    attr "name" "Lexer"
+    attr "slice" "GraphLexer"
+  entity "lexer.component.definition" "lexer.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares one graph-resident lexer"
+    attr "name" "LexerDefinition"
+    attr "slice" "GraphLexer"
+  entity "lexer.component.skip" "lexer.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares lexical input ignored before token selection"
+    attr "name" "SkipRule"
+    attr "slice" "GraphLexer"
+  entity "lexer.component.selection" "lexer.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares deterministic token selection policy"
+    attr "name" "Selection"
+    attr "slice" "GraphLexer"
+  entity "lexer.component.token-source" "lexer.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares where lexical terminals are obtained"
+    attr "name" "TokenSource"
+    attr "slice" "GraphLexer"
+  entity "lexer4.schema" "lexer.schema"
+    port "definition" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "skip" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "selection" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token-source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "first-class deterministic lexer over graph-derived grammar terminals"
+    attr "name" "Lexer4"
+    attr "slice" "GraphLexer"
+  connect "lexer.component.definition" "self" "lexer4.schema" "definition" "lexer.component"
+  connect "lexer.component.skip" "self" "lexer4.schema" "skip" "lexer.component"
+  connect "lexer.component.selection" "self" "lexer4.schema" "selection" "lexer.component"
+  connect "lexer.component.token-source" "self" "lexer4.schema" "token-source" "lexer.component"
+  entity "graph-lexer.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "cardinality-aware combinator grammar with graph-resident lexical analysis"
+    attr "name" "GraphLexer"
+    attr "slice" "GraphLexer"
+  connect "grammar.component.expression" "self" "graph-lexer.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "graph-lexer.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "graph-lexer.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "graph-lexer.schema" "sequence" "grammar.component"
+  connect "grammar.component.choice" "self" "graph-lexer.schema" "choice" "grammar.component"
+  connect "grammar.component.optional" "self" "graph-lexer.schema" "optional" "grammar.component"
+  connect "grammar.component.repeat" "self" "graph-lexer.schema" "repeat" "grammar.component"
+  connect "grammar.component.capture" "self" "graph-lexer.schema" "capture" "grammar.component"
+  connect "grammar.component.cardinality" "self" "graph-lexer.schema" "cardinality" "grammar.component"
+  connect "grammar.component.precedence" "self" "graph-lexer.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "graph-lexer.schema" "associativity" "grammar.component"
+  connect "grammar.component.lexer" "self" "graph-lexer.schema" "lexer" "grammar.component"
+  entity "lexer.bool0.source.grammar-literals" "lexer.token-source"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar-literals"
+    attr "slice" "GraphLexer"
+    attr "source" "grammar-literals"
+  entity "lexer.bool0.skip.whitespace" "lexer.skip-rule"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "class" "unicode"
+    attr "kind" "whitespace"
+    attr "language" "language.bool0"
+    attr "name" "unicode-whitespace"
+    attr "slice" "GraphLexer"
+  entity "lexer.bool0.skip.comment" "lexer.skip-rule"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "kind" "line-comment"
+    attr "language" "language.bool0"
+    attr "name" "slash-line-comment"
+    attr "prefix" "//"
+    attr "slice" "GraphLexer"
+  entity "lexer.bool0.selection.longest" "lexer.selection"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "boundary" "identifier-ish"
+    attr "language" "language.bool0"
+    attr "mode" "longest-match"
+    attr "name" "longest-match"
+    attr "slice" "GraphLexer"
+    attr "tie-break" "lexical"
+  entity "lexer.bool0" "lexer.definition"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "skip01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "skip02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "selection" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "failure" "fail-closed"
+    attr "language" "language.bool0"
+    attr "name" "Bool0Lexer"
+    attr "slice" "GraphLexer"
+    attr "version" "4"
+  connect "lexer4.schema" "self" "lexer.bool0" "schema" "lexer.schema"
+  connect "lexer.bool0.source.grammar-literals" "self" "lexer.bool0" "source" "lexer.token-source"
+  connect "lexer.bool0.skip.whitespace" "self" "lexer.bool0" "skip01" "lexer.skip"
+  connect "lexer.bool0.skip.comment" "self" "lexer.bool0" "skip02" "lexer.skip"
+  connect "lexer.bool0.selection.longest" "self" "lexer.bool0" "selection" "lexer.selection"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "typed-captures.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "cardinality-v3"
+    attr "language" "language.bool0"
+    attr "lexer-model" "first-class-v4"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "precedence-climbing"
+    attr "printer" "capture-graph"
+    attr "slice" "GraphLexer"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "graph-lexer"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "graph-lexer.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "GraphLexer"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort;lexer.definition;lexer.selection;lexer.skip-rule;lexer.token-source"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "GraphLexer"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;language.constructor;language.constructor-field;language.sort;lexer.selection;lexer.skip-rule;lexer.token-source"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
