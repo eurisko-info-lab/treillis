@@ -1,0 +1,634 @@
+delta-change "statements-suites"
+message "StatementSuites: recursive statement and suite semantics"
+author "ai"
+doc "guide" """
+  |# StatementSuites: recursive statement and suite semantics
+  |
+  |StatementSuites is a post-constitution Trellis product layered over VirtualLayout. It does **not** extend or mutate the frozen F0–F11 bootstrap constitution.
+  |
+  |VirtualLayout made virtual `NEWLINE`, `INDENT`, and `DEDENT` events consumable by ordinary graph grammar expressions. Its flat block example deliberately left one boundary open: a parent suite encoded every item as `Expr NEWLINE`, but a nested block already consumes the newline before its closing `DEDENT`. StatementSuites makes that ownership explicit rather than adding a parser preference.
+  |
+  |## Product identity
+  |
+  |```text
+  |StatementSuites.delta
+  |1f159029e12316341d1b1bb17b9fcbbf6649cd0b352bfc0a113234f623b949ec
+  |
+  |StatementSuites root
+  |d13140f3ccda4f625276b1996a6d20aae82e5142d64d717b573b11f2696fbc3d
+  |
+  |510 nodes
+  |746 edges
+  |510 entities
+  |```
+  |
+  |StatementSuites depends exactly on VirtualLayout.
+  |
+  |## Statement form is graph data
+  |
+  |Each production now has a typed `grammar.statement-form` edge to one of two first-class entities:
+  |
+  |```text
+  |grammar.statement-form.simple
+  |  statement terminates by consuming NEWLINE in its containing suite
+  |
+  |grammar.statement-form.compound
+  |  statement terminates at its own closing DEDENT
+  |```
+  |
+  |All pre-existing Bool0 productions are `simple`. `grammar.bool0.prod.block` is `compound`.
+  |
+  |This classification is syntactic metadata on productions, not a test on constructor names in Scala.
+  |
+  |## Suite is a first-class grammar expression
+  |
+  |StatementSuites adds `grammar.suite`. Bool0's block grammar becomes conceptually:
+  |
+  |```text
+  |Block :=
+  |  "block"
+  |  NEWLINE
+  |  Suite(field=items, sort=Expr, min=1, max=8)
+  |```
+  |
+  |The suite expression points to:
+  |
+  |```text
+  |sort        -> Expr
+  |cardinality -> many
+  |newline     -> layout.token.newline
+  |indent      -> layout.token.indent
+  |dedent      -> layout.token.dedent
+  |```
+  |
+  |The suite interpreter owns `INDENT` and `DEDENT`. For each captured statement it consults the parsed production's graph-resident statement form:
+  |
+  |```text
+  |simple   => parse Expr, then consume NEWLINE
+  |compound => parse Expr, consume no parent NEWLINE
+  |```
+  |
+  |No newline preference or constructor exception is built into the parser.
+  |
+  |## Nested blocks
+  |
+  |This source is now compositional:
+  |
+  |```text
+  |block
+  |  true
+  |  block
+  |    false
+  |    block
+  |      !true
+  |  false
+  |```
+  |
+  |The AST shape introduced by VirtualLayout is unchanged. `Block.items` remains `Many[Expr]`; nested blocks are simply nested `Block` trees.
+  |
+  |At a multi-level dedent the virtual stream can contain:
+  |
+  |```text
+  |NEWLINE DEDENT DEDENT
+  |```
+  |
+  |The innermost suite consumes its final simple statement's `NEWLINE` and its own `DEDENT`. The enclosing block is a compound statement, so its parent suite consumes no extra newline and can immediately observe the next `DEDENT` or statement.
+  |
+  |## Bidirectional printing
+  |
+  |Printing is the exact dual of parsing. A suite prints:
+  |
+  |1. `INDENT`
+  |2. each item using its normal production
+  |3. `NEWLINE` only for productions whose statement form is `simple`
+  |4. `DEDENT`
+  |
+  |A compound nested block therefore leaves the printer at a line boundary without a fabricated separator.
+  |
+  |## Compatibility
+  |
+  |VirtualLayout remains independently materializable as `Language.virtual-layout`. Flat blocks are observationally equivalent between VirtualLayout and StatementSuites:
+  |
+  |```text
+  |block
+  |  true
+  |  !false
+  |```
+  |
+  |normalizes in both to:
+  |
+  |```text
+  |block
+  |  true
+  |  ! false
+  |```
+  |
+  |Lossless SourceProvenance source provenance and SourceMapLayout layout events are still preserved underneath the semantic suite stream.
+  |
+  |## Free changes
+  |
+  |`DeltaBool0` admits `grammar.suite` in its graph-defined replace/remove convenience operators. Suite bounds and structure can therefore evolve without changing host parser code. Statement-form classification itself can evolve with the already-free `connect`/`disconnect` generators by rewiring a production to a different first-class form entity.
+  |
+  |Invalid suite bounds, missing statement-form relationships, unsupported forms, and malformed indentation fail closed.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "virtual-layout"
+  assert "introduces" "grammar.component.statement-form" "grammar.component"
+depends "virtual-layout"
+  entity "grammar.component.statement-form" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "declares whether a production is line-terminated or suite-terminated"
+    attr "name" "StatementForm"
+    attr "slice" "StatementSuites"
+  entity "grammar.component.suite" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "captures a recursively nestable offside suite with explicit statement termination"
+    attr "name" "Suite"
+    attr "slice" "StatementSuites"
+  entity "grammar.statement-form.simple" "grammar.statement-form"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "statement ends by consuming NEWLINE in its containing suite"
+    attr "name" "simple"
+    attr "slice" "StatementSuites"
+  entity "grammar.statement-form.compound" "grammar.statement-form"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "statement ends at its own closing DEDENT and consumes no parent NEWLINE"
+    attr "name" "compound"
+    attr "slice" "StatementSuites"
+  entity "statement-suites.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout-token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "suite" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "VirtualLayout layout terminals plus explicit recursive statement/suite ownership"
+    attr "name" "StatementSuites"
+    attr "slice" "StatementSuites"
+  connect "grammar.component.expression" "self" "statement-suites.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "statement-suites.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "statement-suites.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "statement-suites.schema" "sequence" "grammar.component"
+  connect "grammar.component.choice" "self" "statement-suites.schema" "choice" "grammar.component"
+  connect "grammar.component.optional" "self" "statement-suites.schema" "optional" "grammar.component"
+  connect "grammar.component.repeat" "self" "statement-suites.schema" "repeat" "grammar.component"
+  connect "grammar.component.capture" "self" "statement-suites.schema" "capture" "grammar.component"
+  connect "grammar.component.cardinality" "self" "statement-suites.schema" "cardinality" "grammar.component"
+  connect "grammar.component.precedence" "self" "statement-suites.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "statement-suites.schema" "associativity" "grammar.component"
+  connect "grammar.component.token" "self" "statement-suites.schema" "token" "grammar.component"
+  connect "grammar.component.lexer" "self" "statement-suites.schema" "lexer" "grammar.component"
+  connect "grammar.component.source" "self" "statement-suites.schema" "source" "grammar.component"
+  connect "grammar.component.source-map" "self" "statement-suites.schema" "source-map" "grammar.component"
+  connect "grammar.component.layout" "self" "statement-suites.schema" "layout" "grammar.component"
+  connect "grammar.component.layout-token" "self" "statement-suites.schema" "layout-token" "grammar.component"
+  connect "grammar.component.statement-form" "self" "statement-suites.schema" "statement-form" "grammar.component"
+  connect "grammar.component.suite" "self" "statement-suites.schema" "suite" "grammar.component"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar.bool0.g2.true.body" "self" "grammar.bool0.prod.true" "body" "grammar.body"
+  disconnect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.true" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.true" "precedence" "grammar.precedence"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.true" "sort" "grammar.sort"
+  replace "grammar.bool0.prod.true" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "10"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.g2.true.body" "self" "grammar.bool0.prod.true" "body" "grammar.body"
+  connect "language.bool0.ctor.True" "self" "grammar.bool0.prod.true" "constructor" "grammar.constructor"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.true" "associativity" "grammar.associativity"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.true" "precedence" "grammar.precedence"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.true" "sort" "grammar.sort"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.true" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.false" "associativity" "grammar.associativity"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.false" "sort" "grammar.sort"
+  disconnect "grammar.bool0.g2.false.body" "self" "grammar.bool0.prod.false" "body" "grammar.body"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.false" "precedence" "grammar.precedence"
+  disconnect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.false" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "20"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.false" "associativity" "grammar.associativity"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.false" "sort" "grammar.sort"
+  connect "grammar.bool0.g2.false.body" "self" "grammar.bool0.prod.false" "body" "grammar.body"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.false" "precedence" "grammar.precedence"
+  connect "language.bool0.ctor.False" "self" "grammar.bool0.prod.false" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.false" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "grammar.bool0.assoc.right" "self" "grammar.bool0.prod.not" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.g2.not.body" "self" "grammar.bool0.prod.not" "body" "grammar.body"
+  disconnect "grammar.bool0.precedence.prefix" "self" "grammar.bool0.prod.not" "precedence" "grammar.precedence"
+  disconnect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.not" "sort" "grammar.sort"
+  replace "grammar.bool0.prod.not" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "prefix"
+    attr "language" "language.bool0"
+    attr "priority" "30"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "grammar.bool0.assoc.right" "self" "grammar.bool0.prod.not" "associativity" "grammar.associativity"
+  connect "grammar.bool0.g2.not.body" "self" "grammar.bool0.prod.not" "body" "grammar.body"
+  connect "grammar.bool0.precedence.prefix" "self" "grammar.bool0.prod.not" "precedence" "grammar.precedence"
+  connect "language.bool0.ctor.Not" "self" "grammar.bool0.prod.not" "constructor" "grammar.constructor"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.not" "sort" "grammar.sort"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.not" "statement-form" "grammar.statement-form"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.and" "sort" "grammar.sort"
+  disconnect "grammar.bool0.precedence.and" "self" "grammar.bool0.prod.and" "precedence" "grammar.precedence"
+  disconnect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  disconnect "grammar.bool0.assoc.left" "self" "grammar.bool0.prod.and" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.g2.and.body" "self" "grammar.bool0.prod.and" "body" "grammar.body"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  replace "grammar.bool0.prod.and" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "infix"
+    attr "language" "language.bool0"
+    attr "priority" "40"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.and" "sort" "grammar.sort"
+  connect "grammar.bool0.precedence.and" "self" "grammar.bool0.prod.and" "precedence" "grammar.precedence"
+  connect "language.bool0.ctor.And" "self" "grammar.bool0.prod.and" "constructor" "grammar.constructor"
+  connect "grammar.bool0.assoc.left" "self" "grammar.bool0.prod.and" "associativity" "grammar.associativity"
+  connect "grammar.bool0.g2.and.body" "self" "grammar.bool0.prod.and" "body" "grammar.body"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.and" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.g2.or.body" "self" "grammar.bool0.prod.or" "body" "grammar.body"
+  disconnect "grammar.bool0.precedence.or" "self" "grammar.bool0.prod.or" "precedence" "grammar.precedence"
+  disconnect "grammar.bool0.assoc.left" "self" "grammar.bool0.prod.or" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.or" "sort" "grammar.sort"
+  disconnect "language.bool0.ctor.Or" "self" "grammar.bool0.prod.or" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.or" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "infix"
+    attr "language" "language.bool0"
+    attr "priority" "50"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.g2.or.body" "self" "grammar.bool0.prod.or" "body" "grammar.body"
+  connect "grammar.bool0.precedence.or" "self" "grammar.bool0.prod.or" "precedence" "grammar.precedence"
+  connect "grammar.bool0.assoc.left" "self" "grammar.bool0.prod.or" "associativity" "grammar.associativity"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.or" "sort" "grammar.sort"
+  connect "language.bool0.ctor.Or" "self" "grammar.bool0.prod.or" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.or" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.g2.group.body" "self" "grammar.bool0.prod.group" "body" "grammar.body"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.group" "sort" "grammar.sort"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.group" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.group" "precedence" "grammar.precedence"
+  disconnect "language.bool0.ctor.Group" "self" "grammar.bool0.prod.group" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.group" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "group"
+    attr "language" "language.bool0"
+    attr "priority" "60"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.g2.group.body" "self" "grammar.bool0.prod.group" "body" "grammar.body"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.group" "sort" "grammar.sort"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.group" "associativity" "grammar.associativity"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.group" "precedence" "grammar.precedence"
+  connect "language.bool0.ctor.Group" "self" "grammar.bool0.prod.group" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.group" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.maybe" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.maybe" "precedence" "grammar.precedence"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  disconnect "grammar.bool0.g3.maybe.body" "self" "grammar.bool0.prod.maybe" "body" "grammar.body"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.maybe" "sort" "grammar.sort"
+  disconnect "language.bool0.ctor.Maybe" "self" "grammar.bool0.prod.maybe" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.maybe" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "70"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.maybe" "associativity" "grammar.associativity"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.maybe" "precedence" "grammar.precedence"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.g3.maybe.body" "self" "grammar.bool0.prod.maybe" "body" "grammar.body"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.maybe" "sort" "grammar.sort"
+  connect "language.bool0.ctor.Maybe" "self" "grammar.bool0.prod.maybe" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.maybe" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.g3.all.body" "self" "grammar.bool0.prod.all" "body" "grammar.body"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.all" "associativity" "grammar.associativity"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.all" "sort" "grammar.sort"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.all" "precedence" "grammar.precedence"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "language.bool0.ctor.All" "self" "grammar.bool0.prod.all" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.all" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "80"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.g3.all.body" "self" "grammar.bool0.prod.all" "body" "grammar.body"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.all" "associativity" "grammar.associativity"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.all" "sort" "grammar.sort"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.all" "precedence" "grammar.precedence"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "language.bool0.ctor.All" "self" "grammar.bool0.prod.all" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.all" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.var" "precedence" "grammar.precedence"
+  disconnect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.var" "associativity" "grammar.associativity"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.var" "sort" "grammar.sort"
+  disconnect "grammar.bool0.g5.var.token" "self" "grammar.bool0.prod.var" "body" "grammar.body"
+  disconnect "language.bool0.ctor.Var" "self" "grammar.bool0.prod.var" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.var" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "90"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.var" "precedence" "grammar.precedence"
+  connect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.var" "associativity" "grammar.associativity"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.var" "sort" "grammar.sort"
+  connect "grammar.bool0.g5.var.token" "self" "grammar.bool0.prod.var" "body" "grammar.body"
+  connect "language.bool0.ctor.Var" "self" "grammar.bool0.prod.var" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.var" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  disconnect "grammar.bool0.g5.number.token" "self" "grammar.bool0.prod.number" "body" "grammar.body"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.number" "precedence" "grammar.precedence"
+  disconnect "language.bool0.ctor.NumberLit" "self" "grammar.bool0.prod.number" "constructor" "grammar.constructor"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.number" "associativity" "grammar.associativity"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.number" "sort" "grammar.sort"
+  replace "grammar.bool0.prod.number" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "100"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  connect "grammar.bool0.g5.number.token" "self" "grammar.bool0.prod.number" "body" "grammar.body"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.number" "precedence" "grammar.precedence"
+  connect "language.bool0.ctor.NumberLit" "self" "grammar.bool0.prod.number" "constructor" "grammar.constructor"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.number" "associativity" "grammar.associativity"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.number" "sort" "grammar.sort"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.number" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.string" "precedence" "grammar.precedence"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.string" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  disconnect "grammar.bool0.g5.string.token" "self" "grammar.bool0.prod.string" "body" "grammar.body"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.string" "sort" "grammar.sort"
+  disconnect "language.bool0.ctor.StringLit" "self" "grammar.bool0.prod.string" "constructor" "grammar.constructor"
+  replace "grammar.bool0.prod.string" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "110"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.string" "precedence" "grammar.precedence"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.string" "associativity" "grammar.associativity"
+  connect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  connect "grammar.bool0.g5.string.token" "self" "grammar.bool0.prod.string" "body" "grammar.body"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.string" "sort" "grammar.sort"
+  connect "language.bool0.ctor.StringLit" "self" "grammar.bool0.prod.string" "constructor" "grammar.constructor"
+  connect "grammar.statement-form.simple" "self" "grammar.bool0.prod.string" "statement-form" "grammar.statement-form"
+  disconnect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.block" "precedence" "grammar.precedence"
+  disconnect "grammar.bool0.g9.block.body" "self" "grammar.bool0.prod.block" "body" "grammar.body"
+  disconnect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.block" "sort" "grammar.sort"
+  disconnect "language.bool0.ctor.Block" "self" "grammar.bool0.prod.block" "constructor" "grammar.constructor"
+  disconnect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.block" "associativity" "grammar.associativity"
+  disconnect "grammar.bool0.prod.block" "self" "grammar.bool0" "p12" "grammar.production"
+  replace "grammar.bool0.prod.block" "grammar.production"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "constructor" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "body" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "statement-form" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "fixity" "atom"
+    attr "language" "language.bool0"
+    attr "priority" "120"
+    attr "slice" "StatementSuites"
+    attr "sort" "Expr"
+  connect "grammar.bool0.precedence.atom" "self" "grammar.bool0.prod.block" "precedence" "grammar.precedence"
+  connect "grammar.bool0.g9.block.body" "self" "grammar.bool0.prod.block" "body" "grammar.body"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.prod.block" "sort" "grammar.sort"
+  connect "language.bool0.ctor.Block" "self" "grammar.bool0.prod.block" "constructor" "grammar.constructor"
+  connect "grammar.bool0.assoc.none" "self" "grammar.bool0.prod.block" "associativity" "grammar.associativity"
+  connect "grammar.bool0.prod.block" "self" "grammar.bool0" "p12" "grammar.production"
+  connect "grammar.statement-form.compound" "self" "grammar.bool0.prod.block" "statement-form" "grammar.statement-form"
+  entity "grammar.bool0.g10.block.suite" "grammar.suite"
+    port "sort" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "newline" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "indent" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "dedent" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "field" "items"
+    attr "language" "language.bool0"
+    attr "max" "8"
+    attr "min" "1"
+    attr "name" "grammar.bool0.g10.block.suite"
+    attr "slice" "StatementSuites"
+  connect "language.bool0.sort.Expr" "self" "grammar.bool0.g10.block.suite" "sort" "grammar.suite-sort"
+  connect "grammar.bool0.cardinality.many" "self" "grammar.bool0.g10.block.suite" "cardinality" "grammar.cardinality"
+  connect "layout.token.newline" "self" "grammar.bool0.g10.block.suite" "newline" "grammar.suite-newline"
+  connect "layout.token.indent" "self" "grammar.bool0.g10.block.suite" "indent" "grammar.suite-indent"
+  connect "layout.token.dedent" "self" "grammar.bool0.g10.block.suite" "dedent" "grammar.suite-dedent"
+  entity "grammar.bool0.g10.block.body" "grammar.sequence"
+    port "item01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "item03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "grammar.bool0.g10.block.body"
+    attr "slice" "StatementSuites"
+  connect "grammar.bool0.g9.block.kw" "self" "grammar.bool0.g10.block.body" "item01" "grammar.sequence-item"
+  connect "grammar.bool0.g9.layout.newline" "self" "grammar.bool0.g10.block.body" "item02" "grammar.sequence-item"
+  connect "grammar.bool0.g10.block.suite" "self" "grammar.bool0.g10.block.body" "item03" "grammar.sequence-item"
+  disconnect "grammar.bool0.g9.block.body" "self" "grammar.bool0.prod.block" "body" "grammar.body"
+  connect "grammar.bool0.g10.block.body" "self" "grammar.bool0.prod.block" "body" "grammar.body"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "StatementSuites"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.layout-token;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.suite;grammar.token;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort;layout.policy;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.definition;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.map-policy;source.policy"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "StatementSuites"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.layout-token;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.suite;grammar.token;language.constructor;language.constructor-field;language.sort;layout.policy;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.map-policy;source.policy"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "layout.bool0.policy" "self" "grammar.bool0" "layout" "grammar.layout"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "virtual-layout.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  disconnect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  disconnect "grammar.bool0.prod.block" "self" "grammar.bool0" "p12" "grammar.production"
+  disconnect "source.map.bool0.policy" "self" "grammar.bool0" "source-map" "grammar.source-map"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  disconnect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p09" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p10" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p11" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p12" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "lexical-v10"
+    attr "language" "language.bool0"
+    attr "layout-model" "suites-v10"
+    attr "lexer-model" "codec-v6"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "layout-canonical"
+    attr "parser" "suite-precedence-climbing"
+    attr "printer" "suite-graph"
+    attr "slice" "StatementSuites"
+    attr "source-map-model" "ast-v8"
+    attr "source-model" "provenance-v7"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "graph-lexer"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "layout.bool0.policy" "self" "grammar.bool0" "layout" "grammar.layout"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  connect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  connect "grammar.bool0.prod.block" "self" "grammar.bool0" "p12" "grammar.production"
+  connect "source.map.bool0.policy" "self" "grammar.bool0" "source-map" "grammar.source-map"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  connect "statement-suites.schema" "self" "grammar.bool0" "schema" "grammar.schema"
