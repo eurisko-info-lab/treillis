@@ -29,7 +29,7 @@ fragment:
 
 ```text
 delta-package common.lambda
-  provides language.core.lambda
+  provides common.lambda.schema
   change add common Lambda Calculus
     entity common.lambda.schema language.package
       attr name Lambda Calculus

@@ -1,7 +1,7 @@
 delta-package squeak.core
   purpose navigation synchronized views previews and review
-  requires squeak.navigation
-  provides squeak.core
+  requires squeak-navigator.schema
+  provides code-view.schema
   include source/squeak/semantic-selection.delta
     post-action validate-graph
   include source/squeak/interactive-svg.delta

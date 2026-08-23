@@ -66,6 +66,11 @@ An assembly requests capabilities and emits a reproducible selected graph. The
 IDE consumes that assembled graph; it does not scan source deltas and invent a
 product chain.
 
+Package dependencies and exports are real graph endpoints: `entity.path` names
+a typed node and `entity.path#port` names a specific typed connection point.
+Discovery rejects missing or falsely claimed endpoints; assembly compilation
+rechecks selected and exposed endpoints against the materialized graph.
+
 ## Trellis Squeak
 
 Start the local image service and web shell:

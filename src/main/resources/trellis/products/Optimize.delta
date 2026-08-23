@@ -1,8 +1,8 @@
 delta-package optimization.core
   purpose equality saturation extraction and executable lowering
-  requires squeak.core
-  requires language.trellis.lowering
-  provides optimization.core
+  requires code-view.schema
+  requires session-protocols.schema
+  provides deltanet-lowering.schema
   include source/optimization/egraph-derivation.delta
     post-action validate-graph
   include source/optimization/optimization-laws.delta

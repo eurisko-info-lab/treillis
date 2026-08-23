@@ -2,7 +2,7 @@ package trellis
 
 import trellis.Core.*
 import trellis.Delta.*
-import trellis.storage.{AssemblyCatalog, AssemblyLanguage, Composition, CompositionCatalog, DeltaSource, ManifestLanguage, ProductCatalog}
+import trellis.storage.{AssemblyCatalog, AssemblyLanguage, Composition, CompositionCatalog, DeltaSource, GraphContract, ManifestLanguage, ProductCatalog}
 import trellis.storage.Composition.*
 import trellis.storage.{PostActions, SelectionApplication}
 import trellis.TestSupport.*
@@ -66,6 +66,20 @@ object CompositionTest:
   private val handlers: Map[String, PostActions.Handler] = Map("validate-graph" -> (_ => Right(())))
 
   val tests = Vector(
+    Test("graph contracts reject UIDs and missing typed ports", () => {
+      check(GraphContract.parse("@" + ("a" * 64)).isLeft)
+      val node = Node("contract.service", Vector(Port("api", Direction.Out, Ty.Atom("Api"))))
+      val graph = Graph().copy(nodes = Map(Canon.nodeId(node) -> node), entities = Map(EntityId("service.api") -> Canon.nodeId(node)))
+      equal(right(GraphContract.resolve(graph, "service.api#api")).port.map(_.ty), Some(Ty.Atom("Api")))
+      check(GraphContract.resolve(graph, "service.api#missing").left.exists(_.contains("names no port")))
+    }),
+    Test("discovery rejects a package that falsely claims an export", () => {
+      val change = Change(Set.empty, Vector(Op.ReplaceEntity(EntityId("actual.node"), Node("contract.service"))), "actual")
+      val id = Change.id(change)
+      val graph = right(Delta.applyChange(Graph(), change))
+      val falsePackage = Package("false", Set("claimed.node"), fragments = Vector(Fragment(id)))
+      check(GraphContract.validateRegistry(Registry(Vector(falsePackage), Vector.empty), Map(id -> change), graph).left.exists(_.contains("missing graph contract entity")))
+    }),
     Test("delta block strings remove optional margins and round-trip", () => {
       val quotes = "\"\"\""
       val source =
@@ -214,9 +228,10 @@ object CompositionTest:
       val printed = right(AssemblyLanguage.print(assembly))
       equal(right(AssemblyLanguage.parse(printed)), assembly)
       val lock = right(CompositionCatalog.resolveAssembly(assembly))
-      check(lock.providers.contains("example.fibonacci"))
-      check(lock.providers.contains("execute.parallel"))
-      check(lock.providers.contains("execute.sequential"))
-      check(lock.providers.contains("debug.trace"))
+      check(lock.providers.contains("example.tailrec.fibonacci"))
+      check(lock.providers.contains("deltanet.policy.parallel#self"))
+      check(lock.providers.contains("ceskr-transitions.schema"))
+      check(lock.providers.contains("ceskr-traces.schema"))
+      check(CompositionCatalog.resolveAssembly(assembly.copy(exposes = assembly.exposes :+ "unselected.endpoint")).left.exists(_.contains("unselected endpoints")))
     })
   )

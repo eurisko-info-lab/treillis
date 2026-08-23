@@ -1,6 +1,6 @@
 delta-package squeak.navigation
   purpose semantic navigator protocol
-  requires language.trellis.lowering
-  provides squeak.navigation
+  requires session-protocols.schema
+  provides squeak-navigator.schema
   include source/squeak/squeak-navigator.delta
     post-action validate-graph

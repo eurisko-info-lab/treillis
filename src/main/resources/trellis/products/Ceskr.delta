@@ -1,8 +1,8 @@
 delta-package execution.ceskr
   purpose sequential execution debugging and deterministic traces
-  requires language.trellis.lowering
-  provides execute.sequential
-  provides debug.trace
+  requires session-protocols.schema
+  provides ceskr-transitions.schema
+  provides ceskr-traces.schema
   include source/execution/ceskr-transitions.delta
     post-action validate-graph
   include source/execution/ceskr-traces.delta

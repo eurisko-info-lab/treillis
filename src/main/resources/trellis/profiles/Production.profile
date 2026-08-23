@@ -1,5 +1,5 @@
 profile production
-  requires language.trellis.syntax
-  requires language.trellis.lowering
-  requires execute.parallel
-  assumes execute.parallel
+  requires language-bootstrap.schema#self
+  requires session-protocols.schema
+  requires deltanet.policy.parallel#self
+  assumes deltanet.policy.parallel#self

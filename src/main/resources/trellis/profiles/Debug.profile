@@ -1,4 +1,4 @@
 profile debug
   extends production
-  requires execute.sequential
-  requires debug.trace
+  requires ceskr-transitions.schema
+  requires ceskr-traces.schema

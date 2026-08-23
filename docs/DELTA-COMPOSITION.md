@@ -1,8 +1,8 @@
-# Capability-directed delta composition
+# Graph-endpoint-directed delta composition
 
 ## Implemented slice
 
-`Composition.resolve` now performs deterministic capability closure, profile
+`Composition.resolve` now performs deterministic graph-endpoint closure, profile
 inheritance, provider selection, import closure, conflict checks, package
 topological ordering, and canonical lock generation. `ManifestLanguage`
 describes directive shapes as data and provides one parser/printer used by the
@@ -35,7 +35,7 @@ consumer-specific branches.
 
 `common.lambda` is now an inline, human-readable delta package. The manifest
 grammar's generic `change`, `entity`, and `attr` constructs compile it into a
-canonical change; Trellis imports `language.core.lambda`. Production, debug,
+canonical change; Trellis imports `common.lambda.schema`. Production, debug,
 full, and production-IDE locks select the shared package exactly once, and their
 materialized graphs expose qualified `common.lambda.*` entities.
 
@@ -49,48 +49,61 @@ change IDs and deterministic application order.
 
 ```text
 delta-package common.lambda
-  provides language.core.lambda
+  provides common.lambda.schema
   change add common Lambda Calculus
     entity common.lambda.schema language.package
       attr name Lambda Calculus
     post-action validate-graph
 
 delta-package language.trellis
-  imports language.core.lambda
-  provides language.trellis.syntax
-  provides language.trellis.lowering
+  imports common.lambda.schema
+  provides language-bootstrap.schema#self
+  provides session-protocols.schema
   include source/language/language-bootstrap.delta
     post-action validate-graph
   include source/language/lambda-match-semantics.delta
     post-action validate-graph
 
 delta-package execution.deltanet
-  requires language.trellis.lowering
-  provides execute.parallel
+  requires session-protocols.schema
+  provides deltanet-lowering.schema
   include source/optimization/deltanet-lowering.delta
     post-action validate-graph
 
 delta-package execution.ceskr
-  requires language.trellis.lowering
-  provides execute.sequential
-  provides debug.trace
+  requires session-protocols.schema
+  provides ceskr-transitions.schema
+  provides ceskr-traces.schema
   include source/execution/ceskr-transitions.delta
     post-action validate-graph
 
 profile production
-  requires language.trellis.syntax
-  requires execute.parallel
+  requires language-bootstrap.schema#self
+  requires deltanet.policy.parallel#self
 
 profile debug
   extends production
-  requires execute.sequential
-  requires debug.trace
+  requires ceskr-transitions.schema
+  requires ceskr-traces.schema
 ```
 
 Resolving `production` excludes CESK-R naturally: no requested capability has
 the CESK-R package as its selected provider. Resolving `debug` adds it. A
 deployment can request several language syntax/lowering packages while sharing
-one `language.core.lambda` provider.
+one `common.lambda.schema` provider.
+
+## Graph endpoint contracts
+
+`requires`, `imports`, and `provides` are graph paths, not arbitrary labels.
+`name.path` selects a typed entity and `name.path#port` selects one of that
+entity's ports with its exact direction and `Ty`. Normal graph validation
+rejects direction or type mismatches on connected edges.
+
+Catalog discovery fails before assembly when a path is malformed, an entity or
+port does not exist, or a package claims an entity it never introduces or
+replaces. Assembly checks all selected contracts and exposed endpoints again
+against the graph it actually materialized. Change hashes remain repository
+provenance and are not composition names.
 
 ## Resolution
 

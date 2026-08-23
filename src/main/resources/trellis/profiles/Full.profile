@@ -1,4 +1,4 @@
 profile full
-  requires example.fibonacci
-  requires debug.trace
-  requires optimization.differential
+  requires example.tailrec.fibonacci
+  requires ceskr-traces.schema
+  requires differential-certificates.schema

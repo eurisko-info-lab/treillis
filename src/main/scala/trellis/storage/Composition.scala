@@ -114,6 +114,80 @@ object Composition:
   private def sequence[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
     values.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) { (acc, value) => acc.flatMap(xs => value.map(xs :+ _)) }
 
+/** A package contract names graph entities, optionally narrowed to one typed port. */
+object GraphContract:
+  final case class Endpoint(entity: EntityId, port: Option[String]):
+    def render: String = entity.value + port.fold("")(name => s"#$name")
+
+  final case class EndpointType(kind: String, port: Option[Port])
+
+  def parse(value: String): Either[String, Endpoint] =
+    val pieces = value.split("#", -1).toVector
+    val (entity, port) = pieces match
+      case Vector(path) => path -> None
+      case Vector(path, name) if name.nonEmpty => path -> Some(name)
+      case _ => return Left(s"invalid graph endpoint $value")
+    val segments = entity.split("\\.", -1).toVector
+    val validSegment = "[A-Za-z_][A-Za-z0-9_-]*".r
+    if entity.startsWith("@") || segments.isEmpty || segments.exists(segment => validSegment.matches(segment) == false) then
+      Left(s"invalid graph entity path $entity")
+    else Right(Endpoint(EntityId(entity), port))
+
+  def resolve(graph: Graph, value: String): Either[String, EndpointType] =
+    for
+      endpoint <- parse(value)
+      node <- graph.entity(endpoint.entity).toRight(s"missing graph contract entity ${endpoint.entity.value}")
+      port <- endpoint.port match
+        case None => Right(None)
+        case Some(name) => node.port(name).map(Some.apply).toRight(s"graph contract endpoint $value names no port")
+    yield EndpointType(node.kind, port)
+
+  def validateRegistry(registry: Composition.Registry, changes: Map[ChangeId, Change], universe: Graph): Either[String, Unit] =
+    val declarations = registry.packages.flatMap(pkg => (pkg.provides ++ pkg.requires ++ pkg.imports).toVector.map(pkg.id -> _))
+    val providers = registry.packages.flatMap(pkg => pkg.provides.toVector.map(_ -> pkg.id)).groupMap(_._1)(_._2)
+    for
+      _ <- sequence(declarations.map { case (pkg, endpoint) => parse(endpoint).left.map(error => s"package $pkg: $error") })
+      _ <- sequence(registry.packages.flatMap(pkg => (pkg.requires ++ pkg.imports).toVector.sorted.map { endpoint =>
+        providers.getOrElse(endpoint, Vector.empty) match
+          case Vector(_) => Right(())
+          case Vector() => Left(s"package ${pkg.id} requires $endpoint but discovery found no provider")
+          case many => Left(s"package ${pkg.id} requires $endpoint but discovery found ambiguous providers ${many.sorted.mkString(", ")}")
+      }))
+      _ <- sequence(registry.packages.flatMap { pkg =>
+        pkg.provides.toVector.sorted.map { endpoint =>
+          for
+            parsed <- parse(endpoint)
+            endpointType <- resolve(universe, endpoint).left.map(error => s"package ${pkg.id} provides $endpoint: $error")
+            _ <- Either.cond(endpointType.port.forall(_.direction == Direction.Out), (), s"package ${pkg.id} provides input port $endpoint")
+            touched = pkg.fragments.flatMap(fragment => changes.get(fragment.changeId).toVector.flatMap(touchedEntities)).toSet
+            _ <- Either.cond(touched(parsed.entity), (), s"package ${pkg.id} claims $endpoint without introducing or replacing ${parsed.entity.value}")
+          yield ()
+        }
+      })
+      _ <- sequence(registry.packages.flatMap(pkg => (pkg.requires ++ pkg.imports).toVector.sorted.map { endpoint =>
+        resolve(universe, endpoint).left.map(error => s"package ${pkg.id} requires $endpoint: $error")
+      }))
+    yield ()
+
+  def validateSelection(lock: Composition.Lock, graph: Graph): Either[String, Unit] =
+    sequence(lock.providers.toVector.sortBy(_._1).map { case (endpoint, provider) =>
+      resolve(graph, endpoint).left.map(error => s"selected provider $provider for $endpoint: $error")
+    }).map(_ => ())
+
+  def validateEndpoints(label: String, endpoints: Iterable[String], graph: Graph): Either[String, Unit] =
+    sequence(endpoints.toVector.sorted.map(endpoint => resolve(graph, endpoint).left.map(error => s"$label $endpoint: $error"))).map(_ => ())
+
+  private def touchedEntities(change: Change): Vector[EntityId] = change.operations.flatMap {
+    case Op.BindEntity(entity, _) => Vector(entity)
+    case Op.ReplaceEntity(entity, _) => Vector(entity)
+    case Op.RemoveEntity(entity) => Vector(entity)
+    case Op.RefineHole(entity, _) => Vector(entity)
+    case _ => Vector.empty
+  }
+
+  private def sequence[A](values: Vector[Either[String, A]]): Either[String, Vector[A]] =
+    values.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) { (acc, value) => acc.flatMap(xs => value.map(xs :+ _)) }
+
 /** A table-described line grammar shared by delta sets, packages, and profiles. */
 object ManifestLanguage:
   final case class DirectiveSpec(keyword: String, minArgs: Int, maxArgs: Int)

@@ -1,6 +1,6 @@
 delta-package squeak.runtime
   purpose LSP and runtime UI
-  requires storage.network
-  provides squeak.runtime
+  requires artifact-attestations.schema
+  provides lsp-adapter.schema
   include source/squeak/lsp-adapter.delta
     post-action validate-graph

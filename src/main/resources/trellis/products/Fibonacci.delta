@@ -1,6 +1,6 @@
 delta-package example.fibonacci
   purpose tail-recursive Nat example and generated workspace views
-  requires squeak.runtime
-  provides example.fibonacci
+  requires lsp-adapter.schema
+  provides example.tailrec.fibonacci
   include source/examples/fibonacci-workspace.delta
     post-action validate-graph

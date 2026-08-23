@@ -1,4 +1,4 @@
 profile production-ide
-  requires example.fibonacci
-  requires execute.parallel
-  assumes execute.parallel
+  requires example.tailrec.fibonacci
+  requires deltanet.policy.parallel#self
+  assumes deltanet.policy.parallel#self

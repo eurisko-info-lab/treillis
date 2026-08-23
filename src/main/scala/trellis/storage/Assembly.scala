@@ -47,12 +47,16 @@ object AssemblyLanguage:
       ++ assembly.emits.map(value => ManifestLanguage.Line("emit", Vector(value), 2))))
 
   def profile(assembly: Assembly): Profile =
-    Profile(s"assembly:${assembly.id}", assembly.uses, extendsProfiles = Set(assembly.baseProfile), basisCapabilities = Set("execute.parallel"))
+    Profile(s"assembly:${assembly.id}", assembly.uses, extendsProfiles = Set(assembly.baseProfile), basisCapabilities = Set("deltanet.policy.parallel#self"))
 
   def validateSelection(assembly: Assembly, lock: Lock): Either[String, Unit] =
     val selectedCapabilities = lock.providers.keySet
     val forbidden = assembly.omits intersect selectedCapabilities
-    Either.cond(forbidden.isEmpty, (), s"assembly ${assembly.id} selected omitted capabilities ${forbidden.toVector.sorted.mkString(", ")}")
+    val unselectedExposes = assembly.exposes.toSet -- selectedCapabilities
+    for
+      _ <- Either.cond(forbidden.isEmpty, (), s"assembly ${assembly.id} selected omitted endpoints ${forbidden.toVector.sorted.mkString(", ")}")
+      _ <- Either.cond(unselectedExposes.isEmpty, (), s"assembly ${assembly.id} exposes unselected endpoints ${unselectedExposes.toVector.sorted.mkString(", ")}")
+    yield ()
 
   private def values(lines: Vector[ManifestLanguage.Line], tag: String): Vector[String] =
     lines.collect { case ManifestLanguage.Line(`tag`, Vector(value), _) => value }

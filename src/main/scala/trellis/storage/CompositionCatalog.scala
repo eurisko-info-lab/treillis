@@ -12,14 +12,21 @@ import trellis.storage.Composition.*
 /** Loads capability packages and profiles from resources without product-name switches. */
 object CompositionCatalog:
   private final case class ParsedPackage(packageValue: Package, changes: Map[ChangeId, Change])
-  private final case class Loaded(registry: Registry, changes: Map[ChangeId, Change])
+  private final case class Loaded(registry: Registry, changes: Map[ChangeId, Change], universe: Graph)
 
   private lazy val loaded: Loaded =
     val packageResources = discover("trellis/products", ".delta") ++ discoverOptional("trellis/composition", ".delta")
     val parsed = packageResources.map(parsePackage)
     val changes = parsed.flatMap(_.changes).toMap
     if changes.size != parsed.map(_.changes.size).sum then throw IllegalStateException("composition resources repeat a change id")
-    Loaded(Registry(parsed.map(_.packageValue), discover("trellis/profiles", ".profile").map(parseProfile)), changes)
+    val registry = Registry(parsed.map(_.packageValue), discover("trellis/profiles", ".profile").map(parseProfile))
+    val productIds = ProductCatalog.products.map(_.changeId).toSet
+    val supplemental = changes.toVector.filterNot { case (id, _) => productIds(id) }.sortBy(_._1.value).map(_._2)
+    val universe = supplemental.foldLeft[Either[String, Graph]](Right(ProductCatalog.latest)) { (state, change) =>
+      state.flatMap(graph => Delta.applyChange(graph, change))
+    }.fold(error => throw IllegalStateException(s"cannot build discovery graph: $error"), identity)
+    GraphContract.validateRegistry(registry, changes, universe).fold(error => throw IllegalStateException(error), identity)
+    Loaded(registry, changes, universe)
 
   lazy val registry: Registry = loaded.registry
 
@@ -28,6 +35,8 @@ object CompositionCatalog:
   def resolveAssembly(assembly: Assembly): Either[String, Lock] =
     Composition.resolve(registry.copy(profiles = registry.profiles :+ AssemblyLanguage.profile(assembly)), s"assembly:${assembly.id}")
       .flatMap(lock => AssemblyLanguage.validateSelection(assembly, lock).map(_ => lock))
+      .flatMap(lock => GraphContract.validateSelection(lock, loaded.universe).map(_ => lock))
+      .flatMap(lock => GraphContract.validateEndpoints(s"assembly ${assembly.id} exposes", assembly.exposes, loaded.universe).map(_ => lock))
 
   def materialize(
       profile: String,
@@ -63,6 +72,11 @@ object CompositionCatalog:
       val selectedIds = lock.fragments.map(_.changeId).toSet
       val selectedChanges = loaded.changes.view.filterKeys(selectedIds).toMap
       SelectionCompiler.compile(basis, basisFrontier, lock, selectedChanges, handlers)
+    }.flatMap { result =>
+      for
+        _ <- GraphContract.validateSelection(result.lock, result.graph)
+        _ <- GraphContract.validateEndpoints(s"assembly ${assembly.id} exposes", assembly.exposes, result.graph)
+      yield result
     }
 
   private def parsePackage(resource: Resource): ParsedPackage =

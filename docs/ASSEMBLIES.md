@@ -9,11 +9,11 @@ declared foundation in deterministic order.
 assembly squeak-debug
   foundation F11
   base production-ide
-  use execute.sequential
-  use debug.trace
-  expose workspace.browser
-  expose workspace.transcript
-  expose workspace.inspector
+  use ceskr-transitions.schema
+  use ceskr-traces.schema
+  expose example.tailrec.fibonacci
+  expose lsp-adapter.schema
+  expose code-view.schema
   verify embedded-tests
   verify graph-valid
   emit graph
@@ -23,6 +23,11 @@ assembly squeak-debug
 Assembly syntax is described by the shared manifest grammar table and consumed
 by its generic parser and printer. `parse(print(assembly))` is tested. The
 current catalog contains `squeak-debug`; list and compile assemblies with:
+
+All package `requires`/`provides`, assembly `use`, and assembly `expose` values
+are resolvable graph endpoints. A `path#port` endpoint selects a strongly typed
+port. Discovery checks package links without assembling; compilation checks the
+selected links and exposed endpoints against the resulting graph.
 
 ```sh
 sbt "runMain trellis.Main assemblies"

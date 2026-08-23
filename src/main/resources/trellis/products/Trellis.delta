@@ -1,8 +1,8 @@
 delta-package language.trellis
   purpose concrete-language grammar semantics and execution policies
-  imports language.core.lambda
-  provides language.trellis.syntax
-  provides language.trellis.lowering
+  imports common.lambda.schema
+  provides language-bootstrap.schema#self
+  provides session-protocols.schema
   include source/language/language-bootstrap.delta
     post-action validate-graph
   include source/language/grammar-expression-graph.delta
