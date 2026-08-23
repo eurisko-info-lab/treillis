@@ -1,0 +1,62 @@
+delta-change "distributed-cas"
+message "add distributed content-addressed store"
+author "bootstrap"
+doc "guide" """
+  |# DistributedCas: distributed content-addressed store
+  |
+  |DistributedCas moves immutable objects from one process-local map into a deterministic
+  |multi-replica CAS simulation. Writes derive the content identifier directly
+  |from the bytes and place two copies by stable replica identifier. Repeating a
+  |write is idempotent and returns the same object identity and replica state.
+  |
+  |Reads fail closed. The graph-resident CAS policy requires two available copies
+  |and verification of every returned copy against the requested SHA-256 content
+  |identifier. Corrupt, inconsistent, malformed, or under-replicated objects are
+  |rejected rather than silently repaired or accepted. Replica identities and the
+  |replication/read policy are graph data, including duplicate-replica rejection.
+  |
+  |The implementation is deliberately an in-memory distributed simulation. It
+  |establishes placement, replication, and verification semantics without adding
+  |transport or availability assumptions; later network products can attach real
+  |storage nodes to this boundary.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |DistributedCas.delta
+  |1ca62a00715ab96c46d45e0c16e393faa287093ab6ac22f81121800ea551c891
+  |
+  |DistributedCas root
+  |eebaabcec2051d01d7f5992b4726262940178a4121635c61c66e075f7ebacc0e
+  |
+  |720 nodes
+  |783 edges
+  |720 entities
+  |12 delta operations
+  |```
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "publication-ledger"
+  assert "introduces" "distributed-cas.schema" "network.schema"
+depends "publication-ledger"
+  entity "distributed-cas.schema" "network.schema"
+    attr "extends" "PublicationLedger"
+    attr "feature" "distributed-content-addressed-store"
+    attr "name" "DistributedCas"
+  components "network.component" "DistributedCas"
+    component "distributed-cas" "DistributedCAS"
+  entity "network.cas.policy" "network.cas-policy"
+    attr "failure" "strict"
+    attr "placement" "stable-replica-id"
+    attr "read" "verify-all"
+    attr "replicas" "2"
+  entity "network.cas.replica.a" "network.cas-replica"
+    attr "id" "a"
+  entity "network.cas.replica.b" "network.cas-replica"
+    attr "id" "b"
+  entity "network.cas.replica.c" "network.cas-replica"
+    attr "id" "c"
