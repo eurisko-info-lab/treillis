@@ -1,0 +1,321 @@
+delta-change "source-maps-layout"
+message "SourceMapLayout: AST source maps and graph-defined layout tokens"
+author "ai"
+doc "guide" """
+  |# SourceMapLayout: semantic source maps and layout events
+  |
+  |SourceMapLayout is the eighth post-constitution grammar product layer. It is derived from the frozen SourceProvenance product graph by a canonical DeltaTrellis change. It is not F12 and does not alter the frozen F0–F11 bootstrap constitution.
+  |
+  |## Identities
+  |
+  |- SourceMapLayout delta: `d7f8d8ccfb49a1d0353da18aaf419d4a456824298ef713268823fe4e84cc2016`
+  |- SourceMapLayout root: `f19d5ea4d3531c6f3ccea5877cc4199a15908966722a4ef38ce603ae5151aba4`
+  |- Graph size: 488 nodes, 662 edges, 488 entities
+  |
+  |## Purpose
+  |
+  |SourceProvenance established a lossless lexical source envelope with UTF-8 byte spans and preserved trivia. SourceMapLayout builds two independent semantic views over that envelope:
+  |
+  |1. AST source maps: each semantic tree node receives a half-open UTF-8 byte envelope derived from the actual source tokens that produced it.
+  |2. Layout events: indentation-sensitive source produces virtual `NEWLINE`, `INDENT`, and `DEDENT` events according to graph-resident policy.
+  |
+  |Neither feature destroys source text. `SourceDocument.renderLossless` remains byte-for-byte equal to the original source.
+  |
+  |## AST source maps
+  |
+  |The graph defines `source.map.bool0.policy` and connects it to `grammar.bool0` with role `grammar.source-map`. The policy requires:
+  |
+  |- UTF-8 byte coordinates,
+  |- token-envelope node spans,
+  |- field/index paths,
+  |- fail-closed behavior.
+  |
+  |The host derives maps by replaying the graph grammar over source-token slices and comparing semantic trees. It does not infer spans from normalized pretty-print text. Consequently lexical normalization such as `0007 -> 7` preserves the original `[0,4)` source span.
+  |
+  |Paths are structural:
+  |
+  |- `$` for the root,
+  |- `$.left` for a scalar field,
+  |- `$.value` for a present optional field,
+  |- `$.items[0]` for repeated captures.
+  |
+  |## Layout
+  |
+  |The graph defines `layout.bool0.policy` and connects it to `grammar.bool0` with role `grammar.layout`. The initial policy is:
+  |
+  |- mode: `offside`,
+  |- indentation: spaces,
+  |- indent unit: 2,
+  |- tabs: reject,
+  |- blank lines: ignore,
+  |- comment-only lines: ignore,
+  |- root indentation: 0,
+  |- EOF dedent: required,
+  |- failure: fail closed.
+  |
+  |The policy refers to first-class `layout.token` entities for `NEWLINE`, `INDENT`, and `DEDENT`.
+  |
+  |Layout events are virtual. Whitespace and comments remain in SourceProvenance source provenance, so layout interpretation and exact source reconstruction coexist.
+  |
+  |## Laws
+  |
+  |SourceMapLayout preserves the earlier semantic and source laws and adds:
+  |
+  |```text
+  |parseWithSource(source).tree == parse(source)
+  |parseWithSource(source).document.renderLossless == source
+  |sourceMap(root).span == token envelope of the semantic root
+  |layoutSource(source).source.renderLossless == source
+  |layout events are deterministic under a fixed graph policy
+  |```
+  |
+  |## Evolution
+  |
+  |`DeltaBool0` admits `source.map-policy` and `layout.policy` as first-class change targets. Changing the indentation unit therefore changes layout behavior without modifying Scala code. Unsupported policies, tab indentation, non-multiple indentation, and unmatched dedents fail closed.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "source-provenance"
+  assert "introduces" "grammar.component.source-map" "grammar.component"
+depends "source-provenance"
+  entity "grammar.component.source-map" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "AST node to source-span mapping associated with a grammar"
+    attr "name" "SourceMap"
+    attr "slice" "SourceMapLayout"
+  entity "grammar.component.layout" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "offside/layout token policy associated with a grammar"
+    attr "name" "Layout"
+    attr "slice" "SourceMapLayout"
+  entity "source.component.ast-map" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "mapping from semantic AST paths to source spans"
+    attr "name" "AstMap"
+    attr "slice" "SourceMapLayout"
+  entity "source.component.node-span" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "source envelope of one semantic AST node"
+    attr "name" "NodeSpan"
+    attr "slice" "SourceMapLayout"
+  entity "layout.component.policy" "layout.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "layout/offside token generation policy"
+    attr "name" "Policy"
+    attr "slice" "SourceMapLayout"
+  entity "layout.component.token" "layout.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "virtual layout token kind"
+    attr "name" "Token"
+    attr "slice" "SourceMapLayout"
+  entity "layout.component.indentation" "layout.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "indentation measurement policy"
+    attr "name" "Indentation"
+    attr "slice" "SourceMapLayout"
+  entity "layout.token.newline" "layout.token"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "NEWLINE"
+    attr "slice" "SourceMapLayout"
+  entity "layout.token.indent" "layout.token"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "INDENT"
+    attr "slice" "SourceMapLayout"
+  entity "layout.token.dedent" "layout.token"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "DEDENT"
+    attr "slice" "SourceMapLayout"
+  entity "source8.schema" "source.schema"
+    port "document" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "span" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "trivia" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "policy" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "offset-unit" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "trivia-mode" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "attachment" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reconstruction" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "ast-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "node-span" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "SourceProvenance lossless source provenance plus semantic AST source maps"
+    attr "name" "Source8"
+    attr "slice" "SourceMapLayout"
+  connect "source.component.document" "self" "source8.schema" "document" "source.component"
+  connect "source.component.token" "self" "source8.schema" "token" "source.component"
+  connect "source.component.span" "self" "source8.schema" "span" "source.component"
+  connect "source.component.trivia" "self" "source8.schema" "trivia" "source.component"
+  connect "source.component.policy" "self" "source8.schema" "policy" "source.component"
+  connect "source.component.offset-unit" "self" "source8.schema" "offset-unit" "source.component"
+  connect "source.component.trivia-mode" "self" "source8.schema" "trivia-mode" "source.component"
+  connect "source.component.attachment" "self" "source8.schema" "attachment" "source.component"
+  connect "source.component.reconstruction" "self" "source8.schema" "reconstruction" "source.component"
+  connect "source.component.ast-map" "self" "source8.schema" "ast-map" "source.component"
+  connect "source.component.node-span" "self" "source8.schema" "node-span" "source.component"
+  entity "layout8.schema" "layout.schema"
+    port "policy" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "indentation" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "deterministic offside layout tokens from preserved source structure"
+    attr "name" "Layout8"
+    attr "slice" "SourceMapLayout"
+  connect "layout.component.policy" "self" "layout8.schema" "policy" "layout.component"
+  connect "layout.component.token" "self" "layout8.schema" "token" "layout.component"
+  connect "layout.component.indentation" "self" "layout8.schema" "indentation" "layout.component"
+  entity "source.map.bool0.policy" "source.map-policy"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "offset-unit" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "failure" "fail-closed"
+    attr "language" "language.bool0"
+    attr "name" "Bool0AstSourceMap"
+    attr "node-span" "token-envelope"
+    attr "path" "field-index"
+    attr "slice" "SourceMapLayout"
+  connect "source8.schema" "self" "source.map.bool0.policy" "schema" "source.schema"
+  connect "source.offset-unit.utf8-bytes" "self" "source.map.bool0.policy" "offset-unit" "source.offset-unit"
+  entity "layout.bool0.policy" "layout.policy"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "newline" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "indent" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "dedent" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "blank-lines" "ignore"
+    attr "comment-lines" "ignore"
+    attr "eof-dedent" "true"
+    attr "failure" "fail-closed"
+    attr "indent-unit" "2"
+    attr "indentation" "spaces"
+    attr "language" "language.bool0"
+    attr "mode" "offside"
+    attr "name" "Bool0Layout"
+    attr "root-indent" "0"
+    attr "slice" "SourceMapLayout"
+    attr "tabs" "reject"
+  connect "layout8.schema" "self" "layout.bool0.policy" "schema" "layout.schema"
+  connect "layout.token.newline" "self" "layout.bool0.policy" "newline" "layout.token"
+  connect "layout.token.indent" "self" "layout.bool0.policy" "indent" "layout.token"
+  connect "layout.token.dedent" "self" "layout.bool0.policy" "dedent" "layout.token"
+  entity "source-map-layout.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "SourceProvenance lossless provenance plus semantic source maps and deterministic offside layout"
+    attr "name" "SourceMapLayout"
+    attr "slice" "SourceMapLayout"
+  connect "grammar.component.expression" "self" "source-map-layout.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "source-map-layout.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "source-map-layout.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "source-map-layout.schema" "sequence" "grammar.component"
+  connect "grammar.component.choice" "self" "source-map-layout.schema" "choice" "grammar.component"
+  connect "grammar.component.optional" "self" "source-map-layout.schema" "optional" "grammar.component"
+  connect "grammar.component.repeat" "self" "source-map-layout.schema" "repeat" "grammar.component"
+  connect "grammar.component.capture" "self" "source-map-layout.schema" "capture" "grammar.component"
+  connect "grammar.component.cardinality" "self" "source-map-layout.schema" "cardinality" "grammar.component"
+  connect "grammar.component.precedence" "self" "source-map-layout.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "source-map-layout.schema" "associativity" "grammar.component"
+  connect "grammar.component.token" "self" "source-map-layout.schema" "token" "grammar.component"
+  connect "grammar.component.lexer" "self" "source-map-layout.schema" "lexer" "grammar.component"
+  connect "grammar.component.source" "self" "source-map-layout.schema" "source" "grammar.component"
+  connect "grammar.component.source-map" "self" "source-map-layout.schema" "source-map" "grammar.component"
+  connect "grammar.component.layout" "self" "source-map-layout.schema" "layout" "grammar.component"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "SourceMapLayout"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.token;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort;layout.policy;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.definition;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.map-policy;source.policy"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "SourceMapLayout"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.token;language.constructor;language.constructor-field;language.sort;layout.policy;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.map-policy;source.policy"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  disconnect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  disconnect "source-provenance.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  disconnect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p09" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p10" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p11" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source-map" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "layout" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "lexical-v8"
+    attr "language" "language.bool0"
+    attr "layout-model" "offside-v8"
+    attr "lexer-model" "codec-v6"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "precedence-climbing"
+    attr "printer" "token-graph"
+    attr "slice" "SourceMapLayout"
+    attr "source-map-model" "ast-v8"
+    attr "source-model" "provenance-v7"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "graph-lexer"
+  connect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  connect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "source-map-layout.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "source.map.bool0.policy" "self" "grammar.bool0" "source-map" "grammar.source-map"
+  connect "layout.bool0.policy" "self" "grammar.bool0" "layout" "grammar.layout"
