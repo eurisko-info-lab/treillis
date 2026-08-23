@@ -1,0 +1,62 @@
+delta-change "ceskr-traces"
+message "add deterministic canonical CESK-R traces"
+author "bootstrap"
+doc "guide" """
+  |# CeskrTraces: deterministic canonical CESK-R traces
+  |
+  |CeskrTraces layers a strict canonical trace format over CeskrTransitions. A trace records
+  |the language, expression, final data constructor, and contiguous ordered CESK-R
+  |transitions using the repository's UTF-8 length-framed `Canon.record` format.
+  |
+  |The decoder rejects malformed framing, non-contiguous indices, unknown entity
+  |identities, unsupported policy edits, and non-canonical re-encodings. Replay
+  |regenerates the CeskrTransitions derivation and requires exact final-constructor and
+  |transition equality.
+  |
+  |`trace.bool0.policy` selects `canonical-v1`, zero-based contiguous indices,
+  |entity identity, and strict failure. CeskrTraces completes roadmap Slice C; Studio
+  |work begins with the next layer.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |CeskrTraces.delta
+  |39277bdbb84409c1568af1346c2d139657c32b53f6bc5660321376594ce01f4d
+  |
+  |CeskrTraces root
+  |55aa46f619af6e96c15afa54d7d4c7c881dd8943c8a11c20c9791d9a04bd3487
+  |
+  |623 nodes
+  |783 edges
+  |623 entities
+  |16 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "ceskr-transitions"
+  assert "introduces" "ceskr-traces.schema" "grammar.schema"
+depends "ceskr-transitions"
+  entity "ceskr-traces.schema" "grammar.schema"
+    attr "extends" "CeskrTransitions"
+    attr "name" "CeskrTraces"
+    attr "purpose" "deterministic-ceskr-trace-format"
+  entity "trace17.schema" "trace.schema"
+    attr "format" "canonical-v1"
+    attr "name" "Trace17"
+  components "language.component" "CeskrTraces"
+    component "ceskr-trace" "CESKRTrace"
+  components "semantics.component" "CeskrTraces"
+    component "trace-record" "TraceRecord"
+    component "trace-policy" "TracePolicy"
+  rules "semantics.rule"
+    rule "trace-canonical" "trace-canonical" "length-framed-ordered-records"
+    rule "trace-replay" "trace-replay" "verify-value-and-transition-identity"
+  entity "trace.bool0.policy" "language.trace-policy"
+    attr "failure" "strict"
+    attr "format" "canonical-v1"
+    attr "identity" "entity"
+    attr "indices" "zero-based-contiguous"
+    attr "language" "language.bool0"
