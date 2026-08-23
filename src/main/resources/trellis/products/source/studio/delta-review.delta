@@ -1,0 +1,53 @@
+delta-change "delta-review"
+message "add semantic DeltaTrellis review"
+author "bootstrap"
+doc "guide" """
+  |# DeltaReview: semantic DeltaTrellis review
+  |
+  |DeltaReview derives review entries directly from canonical DeltaTrellis operations.
+  |Each entry retains operation order, semantic subject, before/after content IDs,
+  |and an entity/node/edge selection when applicable. Reviews also expose the
+  |canonical footprint and materialized successor graph.
+  |
+  |The graph policy selects operation order, content-ID snapshots, semantic impact
+  |selections, and strict failure.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |DeltaReview.delta
+  |d77c6ea3e1c84e27f382827f3e2f270fb443a110b4e6ad036d4119ff75450ed7
+  |
+  |DeltaReview root
+  |6503c9578a548682461e37bc971e34dd48dbfca3d6f694e6a03dd35d61e5f60c
+  |
+  |658 nodes
+  |783 edges
+  |658 entities
+  |16 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "typst-preview"
+  assert "introduces" "delta-review.schema" "studio.schema"
+depends "typst-preview"
+  entity "delta-review.schema" "studio.schema"
+    attr "extends" "TypstPreview"
+    attr "feature" "semantic-delta-review"
+    attr "name" "DeltaReview"
+  components "studio.component" "DeltaReview"
+    component "delta-review" "DeltaReview"
+    component "review-entry" "ReviewEntry"
+    component "review-snapshot" "ReviewSnapshot"
+    component "review-impact" "ReviewImpact"
+  rules "studio.rule"
+    rule "review-operation-order" "operation-order" "preserve-delta-operation-order"
+    rule "review-semantic-impact" "semantic-impact" "attach-semantic-selection"
+  entity "studio.delta.review-policy" "studio.delta-review-policy"
+    attr "failure" "strict"
+    attr "impacts" "semantic-selection"
+    attr "order" "operation-order"
+    attr "snapshots" "content-id"
