@@ -1,0 +1,61 @@
+delta-change "egraph-derivation"
+message "add resource-aware e-graph derivation"
+author "bootstrap"
+doc "guide" """
+  |# EGraphDerivation: resource-aware e-graph derivation
+  |
+  |EGraphDerivation begins roadmap Slice E by wrapping the frozen F6 equality engine in a
+  |product-level derivation artifact. Graph-owned seeds produce bounded equality
+  |classes plus admitted rewrite identities and the required invariant set.
+  |
+  |The derivation reuses foundation mode guards, proof evidence, preservation of
+  |type/resource/effect/protocol invariants, and saturation bounds. Unsupported
+  |policy and malformed seeds fail closed.
+  |
+  |## Frozen product identity
+  |
+  |```text
+  |EGraphDerivation.delta
+  |68bdc8c4e76b954afe506fc0fd69eaac78f301360079f107b86d77eb5af1b6db
+  |
+  |EGraphDerivation root
+  |cf9ef2b961d38af833d7fb15a11b891f9fefcf46e4bc3e7ce4dfb1ff1880002e
+  |
+  |673 nodes
+  |783 edges
+  |673 entities
+  |18 delta operations
+  |```
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "code-view"
+  assert "introduces" "egraph-derivation.schema" "optimization.schema"
+depends "code-view"
+  entity "egraph-derivation.schema" "optimization.schema"
+    attr "extends" "CodeView"
+    attr "feature" "resource-aware-egraph-derivation"
+    attr "name" "EGraphDerivation"
+  components "optimization.component" "EGraphDerivation"
+    component "derivation" "Derivation"
+    component "eclass" "EClass"
+    component "seed" "Seed"
+  rules "optimization.rule"
+    rule "resource-awareness" "resource-awareness" "enforce-mode-and-required-invariants"
+    rule "bounded-saturation" "bounded-saturation" "reuse-foundation-egraph-bounds"
+  entity "optimization.derivation.policy" "optimization.derivation-policy"
+    attr "engine" "foundation-egraph"
+    attr "failure" "strict"
+    attr "resources" "mode-and-invariants"
+    attr "saturation" "bounded"
+  entity "optimization.seed.beta" "optimization.seed"
+    attr "mode" "unrestricted"
+    attr "operator" "beta-redex"
+  entity "optimization.rewrite.beta" "equality.rewrite"
+    attr "evidence" "proof:beta"
+    attr "lhs" "beta-redex"
+    attr "mode" "unrestricted"
+    attr "preserve" "type;resource;effect;protocol"
+    attr "rhs" "beta-contract"
