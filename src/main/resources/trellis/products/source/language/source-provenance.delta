@@ -1,0 +1,321 @@
+delta-change "source-provenance"
+message "SourceProvenance: lossless source provenance"
+author "ai"
+doc "guide" """
+  |# SourceProvenance: lossless source provenance
+  |
+  |SourceProvenance is the first source-preserving layer above LexicalCodecs. It is a product
+  |slice, not a new bootstrap foundation. F0-F11 remain frozen.
+  |
+  |## Identity
+  |
+  |- predecessor: LexicalCodecs
+  |- delta: `256ca4fb85cace93ff2580cb0837be48ad40564751e178f4eba0bc33b56b6196`
+  |- root: `3e84ee39aa514ff2ff96dd27c35e6a8c6df3b4619d34fb24a926de4d810287fb`
+  |- graph size: 473 nodes, 624 edges, 473 entities
+  |
+  |## Purpose
+  |
+  |LexicalCodecs separates token recognition from semantic lexical values. SourceProvenance
+  |adds a second, orthogonal result: exact lexical provenance. Semantic parsing
+  |still normalizes programs, while `lexSource` preserves the original source.
+  |
+  |A source document records:
+  |
+  |- raw token source text,
+  |- a half-open UTF-8 byte span for each token,
+  |- leading trivia for each token,
+  |- trailing trivia after the last token,
+  |- decoded lexical values separately through the LexicalCodecs codec layer.
+  |
+  |Whitespace and `//` line comments are trivia. They are not injected into the
+  |semantic AST and therefore cannot perturb program meaning.
+  |
+  |## Graph-resident source policy
+  |
+  |`source.bool0.policy` selects first-class values for:
+  |
+  |- offset unit: `utf8-bytes`,
+  |- trivia mode: `preserve`,
+  |- attachment: `leading`,
+  |- reconstruction: `exact`.
+  |
+  |The policy is connected to `grammar.bool0` through `grammar.source`. SourceProvenance
+  |also introduces `source7.schema` and source vocabulary components for document,
+  |token, span, trivia, policy, offset unit, trivia mode, attachment, and
+  |reconstruction.
+  |
+  |The semantic law is:
+  |
+  |```text
+  |lexSource(source).renderLossless == source
+  |```
+  |
+  |while normalized printing remains:
+  |
+  |```text
+  |print(parse(source)) == canonical surface text
+  |```
+  |
+  |These are intentionally different views of the same program.
+  |
+  |## UTF-8 coordinates
+  |
+  |Spans use UTF-8 byte offsets rather than JVM UTF-16 indices. For example:
+  |
+  |```text
+  |π&&true
+  |```
+  |
+  |has token spans:
+  |
+  |```text
+  |π     [0,2)
+  |&&    [2,4)
+  |true  [4,8)
+  |```
+  |
+  |This coordinate system is portable across Scala, Rust, editors, repositories,
+  |and future binary/source adapters.
+  |
+  |## Free changes
+  |
+  |`DeltaBool0` is extended to admit source-policy entities. Edits remain
+  |fail-closed. Disabling whitespace preservation, changing the reconstruction
+  |contract away from `exact`, or selecting an unsupported coordinate unit makes
+  |the graph invalid.
+  |
+  |Language-owned nodes may retain typed links to shared schema/component nodes
+  |when they are rewritten; this does not grant permission to mutate the shared
+  |schema itself.
+  |
+  |## Deliberate boundary
+  |
+  |SourceProvenance preserves lexical provenance but does not yet assign spans to every AST
+  |node and does not synthesize INDENT/DEDENT layout tokens. Those can be layered
+  |next using this lossless token/trivia substrate rather than rediscovering source
+  |positions later.
+  |
+  """
+test "canonical delta contract"
+  assert "canonical"
+  assert "valid"
+  assert "source-roundtrip"
+  assert "dependency" "lexical-codecs"
+  assert "introduces" "grammar.component.source" "grammar.component"
+depends "lexical-codecs"
+  entity "grammar.component.source" "grammar.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "lossless source provenance associated with a grammar"
+    attr "name" "Source"
+    attr "slice" "SourceProvenance"
+  entity "source.component.document" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "lossless source document envelope"
+    attr "name" "Document"
+    attr "slice" "SourceProvenance"
+  entity "source.component.token" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "source token with an exact byte span"
+    attr "name" "Token"
+    attr "slice" "SourceProvenance"
+  entity "source.component.span" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "half-open UTF-8 byte range"
+    attr "name" "Span"
+    attr "slice" "SourceProvenance"
+  entity "source.component.trivia" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "preserved non-semantic source material"
+    attr "name" "Trivia"
+    attr "slice" "SourceProvenance"
+  entity "source.component.policy" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "source provenance and reconstruction policy"
+    attr "name" "Policy"
+    attr "slice" "SourceProvenance"
+  entity "source.component.offset-unit" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "coordinate unit for source spans"
+    attr "name" "OffsetUnit"
+    attr "slice" "SourceProvenance"
+  entity "source.component.trivia-mode" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "trivia retention policy"
+    attr "name" "TriviaMode"
+    attr "slice" "SourceProvenance"
+  entity "source.component.attachment" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "token/trivia attachment policy"
+    attr "name" "Attachment"
+    attr "slice" "SourceProvenance"
+  entity "source.component.reconstruction" "source.component"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "lossless reconstruction contract"
+    attr "name" "Reconstruction"
+    attr "slice" "SourceProvenance"
+  entity "source.offset-unit.utf8-bytes" "source.offset-unit"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "utf8-bytes"
+    attr "slice" "SourceProvenance"
+  entity "source.trivia-mode.preserve" "source.trivia-mode"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "preserve"
+    attr "slice" "SourceProvenance"
+  entity "source.attachment.leading" "source.attachment"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "leading"
+    attr "slice" "SourceProvenance"
+  entity "source.reconstruction.exact" "source.reconstruction"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "name" "exact"
+    attr "slice" "SourceProvenance"
+  entity "source7.schema" "source.schema"
+    port "document" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "span" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "trivia" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "policy" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "offset-unit" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "trivia-mode" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "attachment" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reconstruction" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "lossless lexical provenance with UTF-8 byte spans and preserved trivia"
+    attr "name" "Source7"
+    attr "slice" "SourceProvenance"
+  connect "source.component.document" "self" "source7.schema" "document" "source.component"
+  connect "source.component.token" "self" "source7.schema" "token" "source.component"
+  connect "source.component.span" "self" "source7.schema" "span" "source.component"
+  connect "source.component.trivia" "self" "source7.schema" "trivia" "source.component"
+  connect "source.component.policy" "self" "source7.schema" "policy" "source.component"
+  connect "source.component.offset-unit" "self" "source7.schema" "offset-unit" "source.component"
+  connect "source.component.trivia-mode" "self" "source7.schema" "trivia-mode" "source.component"
+  connect "source.component.attachment" "self" "source7.schema" "attachment" "source.component"
+  connect "source.component.reconstruction" "self" "source7.schema" "reconstruction" "source.component"
+  entity "source-provenance.schema" "grammar.schema"
+    port "expression" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "literal" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reference" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "sequence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "choice" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "optional" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "repeat" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "capture" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "cardinality" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "precedence" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "associativity" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "token" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "description" "LexicalCodecs lexical semantics plus lossless source provenance"
+    attr "name" "SourceProvenance"
+    attr "slice" "SourceProvenance"
+  connect "grammar.component.expression" "self" "source-provenance.schema" "expression" "grammar.component"
+  connect "grammar.component.literal" "self" "source-provenance.schema" "literal" "grammar.component"
+  connect "grammar.component.reference" "self" "source-provenance.schema" "reference" "grammar.component"
+  connect "grammar.component.sequence" "self" "source-provenance.schema" "sequence" "grammar.component"
+  connect "grammar.component.choice" "self" "source-provenance.schema" "choice" "grammar.component"
+  connect "grammar.component.optional" "self" "source-provenance.schema" "optional" "grammar.component"
+  connect "grammar.component.repeat" "self" "source-provenance.schema" "repeat" "grammar.component"
+  connect "grammar.component.capture" "self" "source-provenance.schema" "capture" "grammar.component"
+  connect "grammar.component.cardinality" "self" "source-provenance.schema" "cardinality" "grammar.component"
+  connect "grammar.component.precedence" "self" "source-provenance.schema" "precedence" "grammar.component"
+  connect "grammar.component.associativity" "self" "source-provenance.schema" "associativity" "grammar.component"
+  connect "grammar.component.token" "self" "source-provenance.schema" "token" "grammar.component"
+  connect "grammar.component.lexer" "self" "source-provenance.schema" "lexer" "grammar.component"
+  connect "grammar.component.source" "self" "source-provenance.schema" "source" "grammar.component"
+  entity "source.bool0.policy" "source.policy"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "offset-unit" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "trivia-mode" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "attachment" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "reconstruction" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "line-comments" "preserve"
+    attr "name" "Bool0Source"
+    attr "slice" "SourceProvenance"
+    attr "token-text" "source"
+    attr "whitespace" "preserve"
+  connect "source7.schema" "self" "source.bool0.policy" "schema" "source.schema"
+  connect "source.offset-unit.utf8-bytes" "self" "source.bool0.policy" "offset-unit" "source.offset-unit"
+  connect "source.trivia-mode.preserve" "self" "source.bool0.policy" "trivia-mode" "source.trivia-mode"
+  connect "source.attachment.leading" "self" "source.bool0.policy" "attachment" "source.attachment"
+  connect "source.reconstruction.exact" "self" "source.bool0.policy" "reconstruction" "source.reconstruction"
+  disconnect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  replace "delta.bool0.op.replace" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "replace"
+    attr "primitive" "replace-preserving-edges"
+    attr "slice" "SourceProvenance"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.definition;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.token;language.change-language;language.change-operator;language.constructor;language.constructor-field;language.sort;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.definition;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.policy"
+  connect "delta.bool0.op.replace" "self" "delta.bool0" "op01" "change.operator"
+  disconnect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  replace "delta.bool0.op.remove" "language.change-operator"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "language" "language.bool0"
+    attr "name" "remove"
+    attr "primitive" "remove-with-edges"
+    attr "slice" "SourceProvenance"
+    attr "target-kinds" "grammar.associativity;grammar.capture;grammar.cardinality;grammar.choice;grammar.literal;grammar.optional;grammar.precedence;grammar.production;grammar.reference;grammar.repeat;grammar.sequence;grammar.token;language.constructor;language.constructor-field;language.sort;lexer.char-class;lexer.choice;lexer.codec.decimal-natural;lexer.codec.identity;lexer.codec.quoted-string;lexer.escape;lexer.literal;lexer.repeat;lexer.rule;lexer.selection;lexer.sequence;lexer.skip-rule;lexer.token-source;source.policy"
+  connect "delta.bool0.op.remove" "self" "delta.bool0" "op02" "change.operator"
+  disconnect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  disconnect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  disconnect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  disconnect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  disconnect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  disconnect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  disconnect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  disconnect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  disconnect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  disconnect "lexical-codecs.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  disconnect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  disconnect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  disconnect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  disconnect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  replace "grammar.bool0" "grammar.definition"
+    port "p01" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p02" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p03" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p04" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p05" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p06" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p07" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p08" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "lexer" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p09" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p10" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "p11" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "schema" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "source" "in" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    port "self" "out" "3:cap4:meta12:unrestricted14:4:atom6:Schema6:4:none"
+    attr "ambiguity" "unique"
+    attr "expression-model" "lexical-v7"
+    attr "language" "language.bool0"
+    attr "lexer-model" "codec-v6"
+    attr "name" "Bool0Grammar"
+    attr "normalization" "single-space"
+    attr "parser" "precedence-climbing"
+    attr "printer" "token-graph"
+    attr "slice" "SourceProvenance"
+    attr "source-model" "provenance-v7"
+    attr "start-sort" "Expr"
+    attr "tokenizer" "graph-lexer"
+  connect "grammar.bool0.prod.var" "self" "grammar.bool0" "p09" "grammar.production"
+  connect "grammar.bool0.prod.not" "self" "grammar.bool0" "p03" "grammar.production"
+  connect "grammar.bool0.prod.and" "self" "grammar.bool0" "p04" "grammar.production"
+  connect "grammar.bool0.prod.all" "self" "grammar.bool0" "p08" "grammar.production"
+  connect "grammar.bool0.prod.string" "self" "grammar.bool0" "p11" "grammar.production"
+  connect "grammar.bool0.prod.or" "self" "grammar.bool0" "p05" "grammar.production"
+  connect "lexer.bool0" "self" "grammar.bool0" "lexer" "grammar.lexer"
+  connect "grammar.bool0.prod.maybe" "self" "grammar.bool0" "p07" "grammar.production"
+  connect "grammar.bool0.prod.false" "self" "grammar.bool0" "p02" "grammar.production"
+  connect "grammar.bool0.prod.number" "self" "grammar.bool0" "p10" "grammar.production"
+  connect "grammar.bool0" "self" "language.bool0" "grammar" "language.grammar"
+  connect "grammar.bool0.prod.group" "self" "grammar.bool0" "p06" "grammar.production"
+  connect "grammar.bool0.prod.true" "self" "grammar.bool0" "p01" "grammar.production"
+  connect "source-provenance.schema" "self" "grammar.bool0" "schema" "grammar.schema"
+  connect "source.bool0.policy" "self" "grammar.bool0" "source" "grammar.source"
